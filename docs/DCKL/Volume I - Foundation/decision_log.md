@@ -380,7 +380,7 @@ LunaOS adopts a **hybrid graphics architecture**:
 ## [DL-011] Root Filesystem — Snapshot-Capable Strategy
 
 **Date:** Architecture Review Meeting #2
-**Status:** PROVISIONAL — implementation (Ext4 vs. Btrfs) under evaluation
+**Status:** ❌ SUPERSEDED by DL-027
 **Source:** Discussion_Session_2.md (was numbered DL-005 internally)
 
 ### Question
@@ -431,7 +431,7 @@ LunaOS follows the **standard Linux UEFI partition layout** for the EFI System P
 ## [DL-013] Wireless Backend
 
 **Date:** Architecture Review Meeting #2
-**Status:** PROVISIONAL — implementation under evaluation
+**Status:** ❌ SUPERSEDED by DL-036
 **Source:** Discussion_Session_2.md (was numbered DL-007 internally)
 
 ### Decision
@@ -744,6 +744,479 @@ Neither goal may come at the expense of the other.
 - A feature that is technically impressive but makes the system feel lifeless does not ship
 - A feature that creates presence but degrades performance does not ship
 - DL-018 is canonical — it cannot be amended by a future DL entry, only by full project review
+
+---
+
+## [DL-025] LGP Wire Format — TLV Binary
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P01 (pending)
+
+### Decision
+The Luna Graphics Protocol uses **TLV (Type-Length-Value)** binary framing for all wire messages. Each message consists of a 1-byte type field, a 4-byte length field, and an N-byte payload. No external serialization framework is required.
+
+### Rationale
+LGP must be dependency-free, easy to debug in C, and simple to evolve. TLV provides append-compatible message evolution, excellent hex-dump debuggability, and a minimal parser footprint. Schema-driven alternatives (Cap'n Proto, FlatBuffers) add build-time dependencies that contradict LunaOS's local-first, minimal-dependency philosophy.
+
+### Consequences
+- All compositor and client implementations encode/decode LGP messages using the TLV format
+- The `lgp_message_t` header struct includes: `uint8_t type`, `uint32_t length`, followed by the payload
+- Message versioning is handled via the `LGP_HELLO` handshake version field, not the wire framing
+- Volume III / 01_lgp.md protocol specification is now finalized and implementation may begin
+
+---
+
+## [DL-026] GPU Backend Strategy — Staged Implementation
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P02 (pending), DL-P03 (pending)
+
+### Decision
+GPU backend is implemented in two stages:
+- **Stage 2:** Software renderer (CPU blit to dumb framebuffer). Proves the compositor pipeline, LGP protocol, and rendering architecture before GPU complexity is introduced.
+- **Stage 3:** Vulkan as the primary GPU renderer. OpenGL/EGL as a fallback for hardware without Vulkan 1.1+ support.
+
+The compositor communicates exclusively with the `lgp-render` abstraction layer. GPU implementation details are isolated behind that layer.
+
+### Rationale
+Separating "compositor protocol works" (Stage 2) from "GPU backend works" (Stage 3) reduces risk. The software renderer allows full LGP protocol development and testing on any machine. Vulkan is chosen as the primary backend for its performance ceiling, explicit synchronization, and DMA-BUF zero-copy import. EGL fallback ensures support on hardware without Vulkan drivers.
+
+### Consequences
+- Stage 2 implementation uses a software renderer only. No GPU API calls in Stage 2.
+- Stage 3 implementation introduces Vulkan backend behind `lgp-render` API
+- No compositor code outside `lgp-render/` may call Vulkan or EGL directly
+- Volume II / 02_rendering_pipeline.md GPU backend section is now resolved
+
+---
+
+## [DL-027] Root Filesystem — Btrfs
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-011 (was Experimental/Provisional)
+
+### Decision
+LunaOS uses **Btrfs** as the root filesystem. ext4 is not the primary target.
+
+Automatic Btrfs snapshots are created before:
+- System updates
+- Kernel updates
+- Driver updates
+
+Manual snapshots remain available at any time.
+
+### Rationale
+The snapshot requirement is a first-class LunaOS feature, not an afterthought. Btrfs delivers native snapshots, copy-on-write, and rollback capability that align with LunaOS's recovery architecture. ext4 cannot deliver these natively. DL-011 was Provisional pending this confirmation — it is now superseded.
+
+### Consequences
+- Installer partitions the root filesystem as Btrfs
+- btrfs-tools included in initramfs
+- Swapfile created with `chattr +C` (CoW disabled for swapfile performance — see DL-038)
+- lpkg daemon creates a Btrfs snapshot before every update transaction (DL-018 atomicity extended to filesystem level)
+- Volume II / 09_filesystem.md updated to reflect Btrfs as final decision
+
+---
+
+## [DL-028] Default System Typeface — Bitcount
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P05 (pending — was recommending Inter)
+
+### Decision
+**Bitcount** is the canonical LunaOS system font for personality-forward contexts:
+- Boot screen
+- Login
+- Dock
+- Luna Island
+- LUNA responses
+- Branding
+- Major UI headings
+
+For dense reading contexts (documentation, terminals, editors, productivity applications), LunaOS uses optimized companion fonts selected for readability. The companion font is to be determined in a future design decision.
+
+### Architectural Principle (from AR-004)
+> Personality where it matters. Readability where it matters.
+
+### Rationale
+Bitcount provides LunaOS with a distinctive visual identity that no other operating system shares. Generic screen fonts (Inter, Noto) would produce a desktop that looks like any other Linux distribution. The split usage policy ensures personality never comes at the expense of readability for extended reading tasks.
+
+### Consequences
+- Bitcount font files ship with LunaOS base install
+- `LunaTheme.current().typography.family_display` = "Bitcount"
+- A separate `typography.family_reading` token will hold the companion font (pending DL entry)
+- Volume III / 06_theme_engine.md typeface section updated to Bitcount
+
+---
+
+## [DL-029] Text Rendering Library — FreeType + HarfBuzz
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P06 (pending)
+
+### Decision
+LunaGUI uses **FreeType** for glyph rasterization and **HarfBuzz** for text shaping. No custom text rendering engine will be developed for Version 1.
+
+### Rationale
+FreeType + HarfBuzz is the industry standard for Linux text rendering. It provides mature Unicode support, complex script shaping (Arabic, Devanagari, CJK), high-quality hinting, and excellent community maintenance. No alternative offers comparable correctness for an OS-level toolkit.
+
+### Consequences
+- `libfreetype` and `libharfbuzz` are first-party dependencies in LunaGUI
+- Volume III / 04_lunagui.md text rendering section is now resolved
+
+---
+
+## [DL-030] LunaGUI Layout Engine — Flexbox Model v1
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P07 (pending)
+
+### Decision
+LunaGUI v1 uses a **flexbox-style box model** layout engine: horizontal and vertical containers with grow/shrink semantics. Constraint-based layout may be introduced in v1.5 or later.
+
+### Rationale
+The flexbox model handles the vast majority of LunaOS application layouts (settings panels, file managers, status bars, dialogs) with minimal implementation complexity. A constraint solver is significantly harder to implement correctly and debug, and is not required for v1 UI targets.
+
+### Consequences
+- `LunaPanel` widget supports `direction: horizontal | vertical`, `gap`, `align`, `justify` properties
+- No constraint solver is implemented in v1
+- Volume III / 04_lunagui.md layout engine section is now resolved
+
+---
+
+## [DL-031] Compositor Readiness Signal — D-Bus
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P09 (pending)
+
+### Decision
+The LGP compositor signals readiness by publishing a **D-Bus signal**: `org.lunaos.compositor.Ready`. Stage 6 services wait on this signal before connecting to the compositor socket.
+
+### Rationale
+D-Bus is already running at Stage 4. Using it for the compositor readiness signal is architecturally consistent, eliminates polling, and avoids sentinel file proliferation in `/run/`.
+
+### Consequences
+- lgp-compositor registers on D-Bus at startup and emits `Ready` after KMS mode set and LGP socket creation
+- luna-init Stage 6 uses `dbus-wait` or equivalent to block until the signal is received
+- All Stage 6 service startup scripts depend on this D-Bus signal
+
+---
+
+## [DL-032] Input Backend — libinput
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P10 (pending)
+
+### Decision
+The LGP compositor uses **libinput** for all input device management.
+
+### Rationale
+LunaOS will not reimplement years of touchpad compatibility, pointer acceleration, gesture recognition, and device quirk handling. libinput provides all of this and allows engineering effort to focus on LunaOS-specific components. Raw evdev is not a viable alternative for a complete OS.
+
+### Consequences
+- `libinput` is a first-party dependency of lgp-compositor
+- The compositor opens a libinput context at startup, reads events in the main thread event loop
+- No process other than lgp-compositor opens `/dev/input/event*` directly
+- Volume III / 03_compositor.md input backend section is now resolved
+
+---
+
+## [DL-033] Clipboard Architecture — LGP Extension
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P08 (pending)
+
+### Decision
+The LunaOS clipboard is implemented as **LGP protocol extension `lgp_ext_clipboard_v1`**. The compositor owns clipboard state. Clipboard access is governed by the Permission Engine. Applications never communicate clipboard data directly with one another.
+
+### Rationale
+Clipboard ownership by the compositor is architecturally consistent — the compositor already routes input and surfaces. Applications declaring clipboard ownership do so via LGP, and the compositor brokers read requests. This model prevents clipboard snooping by third-party applications without explicit permission.
+
+### Consequences
+- `lgp_ext_clipboard_v1` extension specification to be written in Volume III
+- Applications request clipboard write via `LGP_CLIPBOARD_SET`
+- Applications request clipboard read via `LGP_CLIPBOARD_GET` (Permission Engine may prompt)
+- D-Bus clipboard service is not created — LGP extension is the canonical clipboard interface
+
+---
+
+## [DL-034] Luna Island Interaction — Hybrid Model
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P13 (pending)
+
+### Decision
+Luna Island uses a **hybrid interaction model**:
+- **Short click:** Expand Luna Island into a compact interaction panel
+- **Long press:** Expand into the complete conversational interface
+
+### Rationale
+This model preserves LUNA's ambient presence (short click is a lightweight check-in) while providing the full conversational interface on deliberate long-press interaction. The distinction communicates to users that LUNA has both a lightweight and a full-attention mode.
+
+### Consequences
+- luna-island implements two expansion states: `COMPACT_PANEL` and `FULL_CONVERSATION`
+- Both states are owned by `luna-island` (see DL-044)
+- Short click → `Expand` animation (≤ 300ms) to compact panel
+- Long press (≥ 500ms) → `Expand` animation to full conversational interface
+- Volume IV / 00_luna_runtime.md LUNA Island section updated
+
+---
+
+## [DL-035] Screen Lock Ownership — luna-lock
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P11 (pending)
+
+### Decision
+Screen lock is owned by a dedicated process: **`luna-lock`**. It is not owned by luna-init or luna-shell.
+
+`luna-lock` characteristics:
+- Privileged daemon supervised by luna-init
+- Creates a `LAYER_SYSTEM_MODAL` LGP surface covering all other surfaces
+- Handles PAM authentication
+- Has an AppArmor profile restricting its capabilities
+
+### Rationale
+luna-init should not render graphics. luna-shell is lower-trust and could theoretically be killed to bypass a shell-owned lock. A dedicated `luna-lock` process provides better privilege separation, an independent lifecycle, and cleaner security boundaries.
+
+### Consequences
+- `luna-lock` added to Volume VII / implementation_roadmap.md as a Stage 3 deliverable
+- luna-init starts `luna-lock` when the user requests screen lock (D-Bus method or hotkey)
+- `LAYER_SYSTEM_MODAL` (600) is the lock surface layer — nothing above it except `LAYER_CURSOR` (700)
+- Volume II / 13_component_ownership.md screen lock section updated
+
+---
+
+## [DL-036] Wireless Backend — wpa_supplicant v1
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-013 (was Draft — criteria defined, choice pending)
+
+### Decision
+LunaOS v1 uses **wpa_supplicant** as the Wi-Fi authentication backend, managed by NetworkManager. Migration to iwd may be reconsidered after broader hardware validation in a future release.
+
+### Rationale
+Maximum hardware compatibility is the highest networking priority for v1. wpa_supplicant has broader device support than iwd on current Linux hardware. The NetworkManager integration for wpa_supplicant is mature and well-tested.
+
+### Consequences
+- `wpa_supplicant` included in the base OS image
+- NetworkManager configured to use wpa_supplicant backend
+- iwd is not installed by default in v1
+- DL-013 (criteria) is now superseded — the choice is made
+
+---
+
+## [DL-037] Theme Change Notifications — Dual Channel
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+
+### Decision
+Theme change notifications are delivered through **both** channels:
+- **LGP:** `LGP_THEME_CHANGED` broadcast to all connected graphical clients
+- **D-Bus:** `org.lunaos.theme.Changed` signal for non-graphical services
+
+### Rationale
+Graphical clients use the LGP channel they already have open. Non-graphical services (CLI tools, system daemons that format output with theme-aware colors) need D-Bus. The implementation cost of both channels is negligible.
+
+### Consequences
+- Compositor emits both signals simultaneously on theme switch
+- LunaGUI handles `LGP_THEME_CHANGED` to re-read `LunaTheme.current()`
+- Volume III / 06_theme_engine.md theme switch section updated
+
+---
+
+## [DL-038] Swap Strategy — Swapfile + zram Hierarchy
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+
+### Decision
+LunaOS uses a **swapfile + zram** combination with the following memory hierarchy:
+1. RAM (primary)
+2. zram (compressed RAM — first swap tier)
+3. Swapfile at `/swapfile` (second swap tier, disk-backed)
+
+### Rationale
+Swapfile is simpler than a dedicated swap partition (resizable, no repartitioning, works on Btrfs with `chattr +C`). zram as the first tier provides fast, RAM-based swap that reduces disk I/O for most workload spikes. The swapfile provides a safety net for extreme memory pressure.
+
+### Consequences
+- Installer creates `/swapfile` on the Btrfs root with CoW disabled (`chattr +C`)
+- zram configured at boot by luna-init (from Volume II / 06_memory.md)
+- `vm.swappiness = 10` maintained (swapping is the last resort)
+
+---
+
+## [DL-039] Built-in Themes v1 — Luna Dark Only
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P15 (pending — was recommending shipping both light and dark)
+
+### Decision
+LunaOS Version 1 ships **Luna Dark only**. Light mode is intentionally postponed to a future release.
+
+### Rationale
+Dark mode is LunaOS's visual identity. LUNA's expressions, Island behavior, motion language, semantic color semantics, and particle effects are designed for dark environments. Shipping a light mode in v1 that has not received the same design attention would undermine the coherence of the visual identity. Light mode will be added when it can be designed to the same standard.
+
+### Consequences
+- Theme picker in v1 shows Luna Dark as the only built-in option
+- Community themes (including light variants) may be installed via lpkg in v1
+- Volume III / 06_theme_engine.md light mode section updated to reflect this decision
+
+---
+
+## [DL-040] Accessibility — AT-SPI2
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P12 (pending)
+
+### Decision
+LunaOS exposes accessibility information via **AT-SPI2** (Assistive Technology Service Provider Interface v2). Existing Linux screen readers (Orca, etc.) work without modification.
+
+**v1 minimum:** Full keyboard navigation in all LunaGUI widgets.
+**v1.5 target:** AT-SPI2 bridge allowing external screen readers to interrogate the widget tree.
+
+### Rationale
+Accessibility is a first-class requirement. Using the AT-SPI2 standard means existing assistive technology works without LunaOS-specific modifications. A custom protocol would require screen reader developers to implement LunaOS-specific support — an unacceptable barrier.
+
+### Consequences
+- LunaGUI v1 implements keyboard navigation for all interactive widgets (Tab, Shift-Tab, Enter, Space)
+- LunaGUI v1.5 implements AT-SPI2 D-Bus interface
+- A `luna-a11y` bridge process or in-process AT-SPI2 provider to be designed before v1.5
+
+---
+
+## [DL-041] Voice / TTS — Optional Local, Disabled by Default
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P14 (pending)
+
+### Decision
+Local TTS ships as an **optional component** in v1. Default state: **disabled**. Users explicitly enable voice functionality. No mandatory online voice services.
+
+### Rationale
+TTS architecture must be in scope for v1 so the AI runtime can support it, but forcing it on by default would increase the default install footprint and surprise users. The opt-in model respects user choice while ensuring voice capability is available.
+
+### Consequences
+- A local TTS engine (Piper TTS or equivalent) is packaged as an optional lpkg component
+- LUNA personality Priority 7 (spoken dialogue) activates only when TTS is enabled by the user
+- PipeWire (already running) handles audio output for TTS
+- Settings application includes a Voice section with an enable toggle
+
+---
+
+## [DL-042] AI Runtime Memory — Dynamic, No Fixed Reservation
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** Earlier documentation recommendation of a static 6 GB cgroup cap
+
+### Decision
+The AI runtime memory model has two tiers:
+
+**Presence Engine:** Always running. Intentionally lightweight. No fixed memory ceiling beyond the `luna-ai.slice` soft limit.
+
+**LLM Runtime:** Loads lazily on first demand. Memory allocation scales according to:
+- Selected model size
+- Available system RAM
+- User configuration
+
+**No fixed memory reservation exists.** The `luna-ai.slice` cgroup enforces a limit appropriate to the hardware at install time, not a hardcoded value.
+
+### Architectural Principle (from AR-004)
+> The Presence Engine is always alive. The Intelligence Engine wakes only when needed. Presence is continuous. Reasoning is on demand.
+
+### Rationale
+A fixed 6 GB cap was a documentation estimate that does not account for model variation (a 3B model needs ~2 GB, a 13B model needs ~8 GB) or hardware variation (a 32 GB system should allow more than a 16 GB system). Dynamic scaling is correct architecture.
+
+### Consequences
+- luna-ai-d queries available system RAM at startup and sets `luna-ai.slice memory.max` accordingly
+- The Presence Engine target: < 200 MB RAM at all times
+- The LLM Runtime cap: configurable, defaulting to (total_ram / 4), minimum 2 GB, maximum 12 GB
+- OOM score for Ollama: high (killed first under system memory pressure)
+- Volume IV / 00_luna_runtime.md memory section updated
+
+---
+
+## [DL-043] Boot Splash Transition — Accept the Brief Cut
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+
+### Decision
+LunaOS Version 1 accepts a **brief visual transition** (single black frame, ~16ms at 60Hz) between the luna-init framebuffer boot splash and the LGP compositor's first frame. No architectural complexity is introduced to eliminate this cut.
+
+### Rationale
+Eliminating the cut requires the compositor to start before Stage 4 system services are complete — a bootstrapping problem that creates more complexity than it solves. One frame of black at 60Hz is perceptually imperceptible. Visual polish of the boot transition can be improved in a future release without affecting system architecture.
+
+### Consequences
+- Boot splash renderer (luna-init) stops rendering before compositor takes over
+- lgp-compositor's first frame is its own rendered output
+- The brief cut is documented as intentional behavior, not a bug
+- Volume II / 02_rendering_pipeline.md boot splash handoff section updated
+
+---
+
+## [DL-044] Conversation Panel Ownership — luna-island
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Supersedes:** DL-P20 (pending)
+
+### Decision
+The conversation panel (both compact and full modes, per DL-034) is owned by **`luna-island`**. No additional process is introduced.
+
+### Rationale
+The conversation panel is an expanded state of LUNA's presence, not a separate application. luna-island already owns the LUNA_ISLAND surface. Expanding that surface to contain conversation UI is architecturally simpler than spawning a second graphical process and compositing two surfaces together.
+
+### Consequences
+- luna-island implements three visual states: `AMBIENT` (compact indicator), `COMPACT_PANEL` (short click), `FULL_CONVERSATION` (long press)
+- Transitions between states use `Expand` / `Collapse` motion classes (≤ 300ms)
+- luna-ai-d conversation API remains in luna-ai-d — luna-island calls D-Bus to send/receive messages
+- Volume IV / 00_luna_runtime.md and Volume II / 13_component_ownership.md updated
+
+---
+
+## [AP-001] Architectural Principle — Typography Philosophy
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Type:** Architectural Principle (non-decision record)
+
+> Typography exists to communicate personality without sacrificing readability.
+> Distinctive branding fonts are used where identity matters.
+> Optimized reading fonts are used where productivity matters.
+> Personality should never reduce usability.
+
+This principle governs all future typography decisions in LunaGUI, the theme engine, and built-in applications.
+
+---
+
+## [AP-002] Architectural Principle — AI Runtime Philosophy
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-004
+**Type:** Architectural Principle (non-decision record)
+
+> The Presence Engine is always alive.
+> The Intelligence Engine wakes only when needed.
+> Presence is continuous.
+> Reasoning is on demand.
+
+This principle governs all future luna-ai-d architecture decisions, memory allocation, and startup behavior.
 
 ---
 

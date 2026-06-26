@@ -318,6 +318,123 @@ This is equivalent to the GPU backend question in Discussion_Session_3.md.
 The compositor interfaces with the GPU via the Linux kernel's **DRM/KMS subsystem**:
 - DRM (Direct Rendering Manager) — manages GPU command submission
 - KMS (Kernel Mode Setting) — manages display output mode configuration
+
+### Protocol Versioning and Capability Negotiation
+
+**BLOCKER 5 — Addressed here.**
+
+Every LGP connection begins with a **handshake** before any surface operations. The handshake establishes the protocol version and negotiates capabilities. Without this, LGP v1 clients would break silently against a v2 compositor.
+
+#### LGP_HELLO — Connection Handshake
+
+The first message a client sends after connecting to the compositor socket is always `LGP_HELLO`:
+
+```c
+// Client → Compositor (first message, always)
+typedef struct lgp_hello {
+    uint32_t  magic;           // 0x4C475000  ("LGP\0") — protocol identifier
+    uint16_t  version_major;   // Client's LGP major version (1 for v1)
+    uint16_t  version_minor;   // Client's LGP minor version (0 for v1.0)
+    uint32_t  client_flags;    // Capability flags this client supports
+    char      client_name[64]; // Human-readable client name ("luna-shell", "MyApp 1.0")
+} lgp_hello_t;
+```
+
+The compositor responds with `LGP_HELLO_REPLY`:
+
+```c
+// Compositor → Client (response to LGP_HELLO)
+typedef struct lgp_hello_reply {
+    uint32_t  magic;                   // 0x4C475000 — same identifier
+    uint16_t  version_major;           // Compositor's LGP major version
+    uint16_t  version_minor;           // Compositor's LGP minor version
+    uint32_t  negotiated_flags;        // Intersection of client and compositor capabilities
+    uint32_t  session_id;              // Unique session ID for this connection
+    uint32_t  status;                  // LGP_HELLO_OK or LGP_HELLO_VERSION_REJECTED
+} lgp_hello_reply_t;
+```
+
+If `status` is `LGP_HELLO_VERSION_REJECTED`, the client must disconnect. The compositor will not accept further messages from an incompatible client.
+
+#### Version Compatibility Rules
+
+```
+Compatibility matrix:
+
+  Client version  │  Compositor version  │  Outcome
+  ─────────────────────────────────────────────────────────
+  1.0             │  1.0                 │  Full compatibility
+  1.0             │  1.5                 │  Full compatibility (compositor is backward-compatible)
+  1.0             │  2.0                 │  Rejected if major version differs by > 1
+  1.5             │  1.0                 │  Compositor uses v1.0 protocol only (negotiated_flags)
+  2.0             │  1.0                 │  Rejected — major version mismatch
+```
+
+**Rule:** A compositor always accepts clients from the same major version. A compositor MAY accept clients from the previous major version (e.g., v2 compositor accepts v1 clients) if it implements a backward compatibility layer. A compositor NEVER accepts clients from a future major version.
+
+#### Capability Flags
+
+`client_flags` is a bitmask. Each bit represents an optional LGP capability:
+
+```c
+// LGP Capability Flags (lgp_caps.h)
+#define LGP_CAP_DMA_BUF        (1 << 0)  // Client can provide DMA-BUF buffers
+#define LGP_CAP_CANVAS_SURFACE (1 << 1)  // Client requests CANVAS_SURFACE access
+#define LGP_CAP_DIRECT_LGP     (1 << 2)  // Client bypasses LunaGUI (direct LGP)
+#define LGP_CAP_LAYER_SHELL    (1 << 3)  // Client requests privileged LAYER_SHELL+ access
+#define LGP_CAP_LUNA_ISLAND    (1 << 4)  // Client requests LUNA_ISLAND surface type
+#define LGP_CAP_CURSOR_SHAPE   (1 << 5)  // Client can set custom cursor shapes
+#define LGP_CAP_CLIPBOARD      (1 << 6)  // Client participates in clipboard protocol
+// Bits 7–31: reserved for future capabilities
+```
+
+`negotiated_flags` in the reply is `client_flags & compositor_supported_flags`. The client receives only the capabilities the compositor can actually provide.
+
+Privileged capabilities (`LGP_CAP_LAYER_SHELL`, `LGP_CAP_LUNA_ISLAND`) are granted only if the compositor's policy allows the connecting client. The compositor validates the client identity via the socket peer credentials (`SO_PEERCRED`) against a policy file.
+
+#### LGP Extensions
+
+Beyond the core protocol, LGP supports extensions. An extension is a named set of additional message types that both client and compositor must agree to use.
+
+Extension negotiation happens immediately after `LGP_HELLO`:
+
+```c
+// Client → Compositor (optional, after HELLO)
+typedef struct lgp_request_extension {
+    char      extension_name[64];  // e.g., "lgp_ext_clipboard_v1"
+    uint16_t  version;             // Extension version requested
+} lgp_request_extension_t;
+
+// Compositor → Client
+typedef struct lgp_extension_reply {
+    char      extension_name[64];  // Same as request
+    uint32_t  status;              // LGP_EXT_ACCEPTED or LGP_EXT_REJECTED
+    uint16_t  version;             // Accepted extension version (may be lower than requested)
+    uint32_t  extension_id;        // Numeric ID to use in extension messages
+} lgp_extension_reply_t;
+```
+
+**Planned v1 extensions:**
+
+| Extension name | Purpose | Target |
+|---|---|---|
+| `lgp_ext_clipboard_v1` | Clipboard read/write | Stage 3 |
+| `lgp_ext_cursor_shape_v1` | Per-surface cursor shape | Stage 3 |
+| `lgp_ext_screenshot_v1` | Privileged screen capture | Stage 4 |
+| `lgp_ext_vrr_v1` | Variable refresh rate (adaptive sync) | v1.5 |
+| `lgp_ext_hdr_v1` | HDR output hints | v2 |
+
+Extensions are how LGP grows without breaking existing clients. A client that does not request an extension receives no extension messages. A compositor that does not support an extension rejects it — the client must handle the rejection gracefully and fall back to core protocol behavior.
+
+#### Protocol Version History
+
+| Version | Changes | Status |
+|---|---|---|
+| 1.0 | Initial LGP protocol | **Current — Active** |
+| 1.x | Minor revisions (new capability flags, new extensions) | Future |
+| 2.0 | Major revision — may introduce breaking message format changes | Future |
+
+**ABI Stability Policy:** LGP message structures within a major version are append-only. New fields may be added at the end of a structure. Existing fields may not change type, size, or offset. Message type values (the `type` field in the header) are never reused within a major version.
 - The compositor owns the DRM device (`/dev/dri/card0` or equivalent)
 - No other process has direct DRM access
 
