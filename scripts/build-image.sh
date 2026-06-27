@@ -71,6 +71,15 @@ sudo ln -s usr/sbin "$MNT_ROOT/sbin"
 sudo cp "${BUILD_DIR}/luna-init/luna-init" "$MNT_ROOT/usr/sbin/"
 sudo cp "${BUILD_DIR}/luna-init-ctl/luna-init-ctl" "$MNT_ROOT/usr/bin/"
 
+# Fetch and install busybox for an emergency shell
+if [ ! -f "${BUILD_DIR}/busybox" ]; then
+    echo "  IMAGE   Downloading busybox..."
+    wget -qO "${BUILD_DIR}/busybox" "https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
+    chmod +x "${BUILD_DIR}/busybox"
+fi
+sudo cp "${BUILD_DIR}/busybox" "$MNT_ROOT/usr/bin/"
+sudo ln -s /usr/bin/busybox "$MNT_ROOT/usr/bin/sh"
+
 # Copy configs
 sudo cp -r etc/luna/* "$MNT_ROOT/etc/luna/"
 

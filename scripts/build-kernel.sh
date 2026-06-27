@@ -41,6 +41,24 @@ scripts/config --enable CONFIG_DEVTMPFS_MOUNT
 scripts/config --enable CONFIG_CRYPTO_CRC32C
 scripts/config --disable CONFIG_WERROR
 
+# Enable Framebuffer Console (fbcon) so text renders on the QEMU VGA display
+scripts/config --enable CONFIG_VT
+scripts/config --enable CONFIG_VT_CONSOLE
+scripts/config --enable CONFIG_VT_HW_CONSOLE_BINDING
+scripts/config --enable CONFIG_FB
+scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE
+scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY
+scripts/config --enable CONFIG_FONTS
+scripts/config --enable CONFIG_FONT_8x16
+scripts/config --enable CONFIG_FONT_8x8
+scripts/config --enable CONFIG_DRM
+scripts/config --enable CONFIG_DRM_VIRTIO_GPU
+scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
+scripts/config --enable CONFIG_FB_EFI
+scripts/config --enable CONFIG_SYSFB
+scripts/config --enable CONFIG_SYSFB_SIMPLEFB
+scripts/config --enable CONFIG_DRM_SIMPLEDRM
+
 echo "  KERNEL  Updating configuration..."
 make CC=gcc-13 HOSTCC=gcc-13 olddefconfig >/dev/null
 

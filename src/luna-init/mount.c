@@ -100,6 +100,11 @@ static mount_result_t do_mount(const char *device, const char *mountpoint,
 
     if (mount(device, mountpoint, fstype, flags, data) != 0) {
         int err = errno;
+        if (err == EBUSY) {
+            LUNA_INFO(COMP, "Already mounted (EBUSY): %s at %s", device, mountpoint);
+            track_mount(mountpoint);
+            return MOUNT_OK;
+        }
         if (is_critical(mountpoint)) {
             LUNA_FATAL(COMP, "FATAL: Failed to mount %s (%s) at %s: %s",
                        device, fstype, mountpoint, strerror(err));
