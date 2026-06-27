@@ -335,19 +335,32 @@ Icon design rules:
   Optical center: vertically centered within the grid, not mathematically
 ```
 
-**Icon set:** v1 uses a curated custom icon set for system UI (luna-bar, luna-shell, settings). The icon set is not finalized — pending a design decision. No external icon font (Font Awesome, Material Icons) is used — these carry visual identities that conflict with Mahina's precision aesthetic.
+**Icon set:** Mahina uses **Phosphor Icons** (MIT license) as the system icon set foundation (DL-051). Custom Mahina-specific icons (Luna Island dot, LUNA expressions, lpkg status symbols, Mahina logo mark) supplement the Phosphor library using identical stroke rules.
 
 ```
-TODO:
-Decision not yet finalized.
-Reason: Mahina icon set not selected / created.
-Options:
-  A: Commission original icon set (best visual identity, requires design work)
-  B: Adapt an existing open-source set (Phosphor Icons, Lucide) as a starting point
-  C: Use Unicode symbols for v1 (acceptable for development, not for release)
-Recommendation: Option B — start with Phosphor Icons (open source, MIT, line-style,
-                consistent with Mahina aesthetic) and customize as needed.
-Must be a Decision Log entry before Stage 3.
+Phosphor Icons configuration:
+
+  License:    MIT
+  Style:      Regular weight (2px stroke, rounded corners matching radius-1)
+  Base grid:  24×24px (scales to 16/20/32/48px)
+  Format:     SVG, rendered via LunaGUI's SVG icon pipeline
+  Storage:    /usr/share/icons/mahina/
+
+Phosphor Regular — used for:
+  System UI: luna-bar, luna-shell menus, settings panels
+  Notifications: status icons
+  File manager: file type indicators
+  Application toolbars
+
+Phosphor Bold — used for:
+  Primary action buttons
+  Alert and error indicators
+
+Custom Mahina icons (/usr/share/icons/mahina/custom/):
+  Luna Island AMBIENT dot
+  LUNA expression indicators
+  Mahina logo mark
+  lpkg package status symbols
 ```
 
 ### System Symbols
@@ -440,21 +453,40 @@ These visual patterns are explicitly **forbidden** in Mahina:
 | 4px base grid | This document | ✅ Accepted |
 | Backdrop blur disabled in Stage 2 (software renderer) | DL-026 | ✅ Accepted |
 | Typography Philosophy (Personality / Readability split) | AP-001 | ✅ Accepted |
-| Companion reading font | Pending DL entry | 🔵 Draft |
-| Icon set selection | Pending DL entry | 🔵 Draft |
+| Companion reading font: Inter (SIL OFL 1.1) | DL-050 | ✅ Accepted |
+| System icon set: Phosphor Icons (MIT) | DL-051 | ✅ Accepted |
+
+### Typography System (Complete)
+
+```
+Font stack:
+
+  Bitcount        — Display & personality
+                    Boot screen, login, dock labels, Luna Island,
+                    LUNA responses, major UI headings, branding
+                    Size range: 18pt–72pt
+
+  Inter           — Reading & clarity (DL-050)
+                    Body text, labels, form fields, notifications,
+                    settings panels, installer, all productivity apps
+                    Size range: 10pt–17pt
+                    License: SIL OFL 1.1
+                    Bundle path: /usr/share/fonts/inter/InterVariable.ttf
+
+  JetBrains Mono  — Code & terminal (DL-023)
+                    Terminal buffer, code editors, all monospace contexts
+                    Size range: 11pt–14pt
+```
+
+**Rule:** Inter is always used for body text. Bitcount is never used below 18pt or for more than a single headline in any view. JetBrains Mono is used exclusively for monospace contexts.
 
 ---
 
 ## Open Questions
 
-```
-TODO:
-Decision not yet finalized.
-```
+1. **Companion reading font.** Resolved — Inter (SIL OFL 1.1). See DL-050.
 
-1. **Companion reading font.** The display font is Bitcount. The reading font is unselected. A decision is needed before any productivity application UI is designed. Recommendation: Evaluate IBM Plex Sans, Inter, or commission a companion typeface.
-
-2. **Icon set.** No icon set selected. Recommendation: Phosphor Icons as a starting point, customized. Must be a Decision Log entry.
+2. **Icon set.** Resolved — Phosphor Icons (MIT, line-style). See DL-051.
 
 3. **HiDPI scaling.** This document describes a 1x density system. For 2x HiDPI (Retina-equivalent), all spacing and font values are multiplied. The compositor must report the display's device pixel ratio via `LGP_OUTPUT_INFO` and LunaGUI must scale accordingly. Scaling strategy must be specified before any display work begins.
 
@@ -476,6 +508,6 @@ Decision not yet finalized.
 
 *Document: `Volume III / 09_visual_language.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*Version: 0.1-draft*
-*Depends on: 05_animation_engine.md, 06_theme_engine.md, 07_luna_island.md, DL-028, DL-039, AP-001*
+*Version: 0.2*
+*Depends on: 05_animation_engine.md, 06_theme_engine.md, 07_luna_island.md, DL-028, DL-039, DL-050, DL-051, AP-001*
 *Informs: All Volume V UI components, Volume VI coding standards for UI*

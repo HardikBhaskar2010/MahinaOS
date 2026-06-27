@@ -54,7 +54,7 @@ AI performance is split between the Presence Engine (always on) and the Inferenc
 - **Memory Footprint:** ≤ 200 MB (resident set size).
 - **Context Switch Latency:** When the user switches applications, LUNA mode must update within 500ms.
 
-### Inference Engine (Default Model: Phi-3 Mini 4-bit)
+### Inference Engine (Default Model: Qwen2.5 3B Q4_K_M, DL-046)
 - **Time to First Token (Cold Start):** ≤ 5 seconds (includes spawning Ollama and loading model from SSD to RAM).
 - **Time to First Token (Warm):** ≤ 2 seconds.
 - **Sustained Generation:** ≥ 3 tokens/second on CPU.

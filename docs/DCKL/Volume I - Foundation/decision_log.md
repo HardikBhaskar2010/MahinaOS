@@ -1246,6 +1246,198 @@ Mahina provides a unique identity with high searchability and low ecosystem conf
 
 ---
 
+## [DL-046] Default LLM: Qwen2.5 3B Q4_K_M
+**Date:** 2026-06-27
+**Status:** ✅ Accepted — Supersedes DL-006
+**Session:** AR-006
+
+### Question
+DL-006 designated Phi-3 Mini as the default model but was marked Deprecated pending final selection. What is the canonical v1 default LLM for LUNA?
+
+### Options Considered
+- **Phi-3 Mini 3.8B Q4_K_M** — previous recommendation, Microsoft MIT license
+- **Llama 3.2 3B Q4_K_M** — newer architecture, Meta license
+- **Gemma 2 2B Q4_K_M** — Google, very fast on CPU
+- **Qwen2.5 3B Q4_K_M** — strong instruction following at size class, Apache 2.0
+
+### Decision
+**Qwen2.5 3B Q4_K_M via Ollama.**
+
+Resource profile:
+- RAM: ~2.0 GB loaded (4-bit quantized)
+- Disk: ~1.7 GB
+- License: Apache 2.0
+
+### Reasoning
+Qwen2.5 3B delivers superior instruction following at the 3B parameter class, which is critical for LUNA's personality engine prompt templates. At 2.0 GB RAM loaded, it fits comfortably within the 8GB minimum hardware target alongside the OS and user applications. Apache 2.0 license permits bundling and redistribution without restriction.
+
+### Consequences
+- `10_ai_models.md` updated: default model changed from Phi-3 Mini to Qwen2.5 3B
+- Ollama pull name: `qwen2.5:3b`
+- All hardware requirements documentation updated to reflect the 2.0 GB model RAM profile
+- DL-006 is formally superseded by this entry
+
+---
+
+## [DL-047] First-Boot Offline AI Behavior
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-006
+
+### Question
+If the user has no internet connection on first boot and the AI model has not been downloaded, what does LUNA do?
+
+### Options Considered
+- **Block first boot** until internet is available and model is downloaded
+- **Bundle model in ISO** (~1.7 GB size increase)
+- **DEGRADED mode silently**, notify user to install manually later
+- **Disable AI entirely** until user manually enables it via settings
+
+### Decision
+LUNA starts in **DEGRADED mode** immediately on first boot. A single, non-blocking notification is displayed: *"AI model not installed. Run 'luna model install' when connected to set up LUNA."* Luna Island displays LUNA_AMBER. All non-AI Mahina features function normally. When connectivity is later detected, the model is **not** auto-downloaded — user installs manually or confirms via notification prompt.
+
+### Reasoning
+Blocking first boot on internet availability violates user control and creates a poor install experience on air-gapped or metered connections. Bundling the model increases ISO size unacceptably for a v1 release. Silent auto-download without consent is a privacy violation inconsistent with the project's philosophy. DEGRADED mode is a designed operational state — using it as the offline fallback is architecturally correct.
+
+### Consequences
+- `06_installer.md` updated: first-boot wizard documents this behavior
+- `luna-ai-d` startup sequence must check model availability before entering READY state
+- luna-ai-d must handle `MODEL_NOT_INSTALLED` as a valid permanent state (not just transient)
+- `10_ai_models.md` updated with offline first-boot section
+
+---
+
+## [DL-048] lpkg Package Signing Algorithm: Ed25519
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-006
+
+### Question
+What cryptographic signing algorithm shall lpkg use for package manifests, model manifests, and repository metadata?
+
+### Options Considered
+- **GPG (RSA-4096)** — industry standard, widely understood, complex
+- **Ed25519** — modern, fast, 32-byte public keys, 64-byte signatures
+- **minisign** — Ed25519-based, simpler CLI than GPG
+
+### Decision
+**Ed25519 via libsodium.**
+
+### Reasoning
+Ed25519 is already referenced in `10_ai_models.md` for model manifest signing. Standardizing on a single algorithm across all lpkg signing operations (packages, models, repository metadata) reduces implementation complexity. libsodium provides a hardened, well-audited Ed25519 implementation that does not require the complexity of the GPG ecosystem. Key sizes are small and non-configurable — there is no "RSA key length" debate.
+
+### Consequences
+- lpkg links against libsodium
+- All official Mahina package repositories sign their metadata with Ed25519
+- Key distribution: OS public key bundled at `/etc/luna/keys/mahina-official.pub`
+- `03_package_manager.md` updated with signing specification
+
+---
+
+## [DL-049] luna-ai-d v1 Implementation Language: Python
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-006
+
+### Question
+Should `luna-ai-d` (the AI daemon) be implemented in C, Python, or Rust for version 1?
+
+### Options Considered
+- **C** — consistent with luna-init and lgp-compositor; minimal runtime
+- **Python** — faster development; natural fit for Ollama REST integration
+- **Rust** — memory-safe; good long-term choice for a privileged daemon
+- **Python v1, Rust v2** — pragmatic phased approach
+
+### Decision
+**Python for v1. Rust migration planned for v2.**
+
+Implementation constraints:
+- Packaged as a self-contained Python environment (no system Python dependency)
+- `asyncio` throughout — no blocking calls on the main event loop
+- Daemon RAM target: ≤ 80 MB (excluding model RAM owned by Ollama)
+- Startup time target: ≤ 2 seconds to READY state
+
+### Reasoning
+The AI daemon's performance bottleneck is Ollama inference latency (2–4 seconds), not the daemon's own processing. Python's development speed advantage is decisive for the complex AI logic: personality engine, context engine, conversation management, and memory engine. The Ollama Python library is the reference client. D-Bus integration is well-supported via `dasbus`. This mirrors the lpkg precedent: Python for v1, then migrate to a systems language once architecture is proven.
+
+### Consequences
+- `00_luna_runtime.md` updated: language changed from C to Python for v1
+- `01_coding_standards.md`: Python coding section added (asyncio, packaging rules)
+- AI runtime build does not use the Makefile/C toolchain — uses its own Python packaging
+- Rust v2 migration requires a stable API contract first — no migration begins until v1 is shipped
+
+---
+
+## [DL-050] Companion Reading Font: Inter
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-006
+
+### Question
+What font should be used for body text, productivity applications, settings, notifications, and all reading contexts in Mahina?
+
+### Options Considered
+- **IBM Plex Sans** — technical identity, open source, designed for IBM ecosystem
+- **Inter** — designed for screen readability, neutral identity, widely used
+- **Geist Sans** — modern, technical contexts, Vercel
+- **Outfit** — friendly, modern, strong contrast with Bitcount
+
+### Decision
+**Inter** (Variable Font, SIL OFL 1.1 license).
+
+Typography split:
+- **Bitcount** — Display personality (boot, login, dock, Luna Island, LUNA responses, headings)
+- **Inter** — Reading clarity (body text, labels, form fields, productivity apps, any text longer than a headline)
+- **JetBrains Mono** — Code and terminal (unchanged, DL-023)
+
+### Reasoning
+Inter was designed specifically for screen readability at small sizes. Its large x-height and open apertures make it exceptionally legible. Crucially, Inter carries no visual identity that competes with Bitcount — it is functionally neutral, which is the correct property for a reading font. Single variable font file covers all weights. SIL OFL 1.1 permits bundling and distribution.
+
+### Consequences
+- `09_visual_language.md` updated: companion font section resolved
+- LunaGUI font loading: must load both `Bitcount` (display) and `Inter` (body) at startup
+- Inter Variable Font bundled in the Mahina distribution at `/usr/share/fonts/inter/`
+- All productivity applications default to Inter for body text
+
+---
+
+## [DL-051] System Icon Set: Phosphor Icons
+**Date:** 2026-06-27
+**Status:** ✅ Accepted
+**Session:** AR-006
+
+### Question
+What icon set should Mahina use for system UI in v1?
+
+### Options Considered
+- **Commission original icons** — best visual identity, requires significant design time
+- **Phosphor Icons** — MIT, line-style, 24px grid, matches Mahina aesthetic
+- **Lucide Icons** — MIT, clean line icons, fork of Feather
+- **Unicode symbols** — acceptable for development only, not for release
+
+### Decision
+**Phosphor Icons (Regular weight) as the system icon set foundation.**
+Custom Mahina-specific icons supplemented on top for Luna-specific UI elements.
+
+Profile:
+- License: MIT
+- Style: Line icons, Regular weight (2px stroke, matching Mahina icon rules)
+- Base grid: 24×24px (scales to 16/20/32/48px)
+- Count: 1,200+ icons
+- Custom supplements: Luna Island dot, LUNA expressions, lpkg status symbols, Mahina logo mark
+
+### Reasoning
+Phosphor Icons aligns precisely with Mahina's icon design rules: 2px stroke weight, rounded corners matching radius-1, line-style (not solid), 24px grid. MIT license permits bundling without attribution. The 1,200+ icon library covers all system UI needs without gaps. Custom icons are created as purpose-built SVGs following identical stroke rules — not Phosphor forks.
+
+### Consequences
+- `09_visual_language.md` updated: icon set section resolved
+- Icons bundled in SVG format at `/usr/share/icons/mahina/`
+- LunaGUI SVG icon pipeline must render Phosphor SVGs at 16/20/24/32/48px
+- Custom Mahina icons stored at `/usr/share/icons/mahina/custom/`
+- Decision required before Stage 3 icon rendering work begins — now unblocked
+
+---
+
 *Document: `00_Foundation/decision_log.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
 *This document is append-only. Add new entries at the top of the numbered section.*

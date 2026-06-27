@@ -37,7 +37,7 @@ Installation flow (high level):
     ├─ INSTALL (write to disk)
     ├─ Post-Install (configure bootloader, initramfs)
     └─ First Boot Configuration
-         ├─ AI Model Download (phi3:mini)
+         ├─ AI Model Setup (qwen2.5:3b — optional, skippable if offline)
          └─ LUNA Online
 ```
 
@@ -139,6 +139,7 @@ Disk Selection:
   Partitioning mode:
   ● Automatic (recommended) — Mahina manages partitioning
     Creates: EFI (512MB) + Root Btrfs (remaining space)
+    Btrfs subvolumes: @, @home, @snapshots (DL-027)
   ○ Manual — Advanced users only
   ○ Install alongside existing OS — Dual boot (v1.5)
 
@@ -178,7 +179,34 @@ Partition plan (review before writing):
   Timezone:   [ Asia/Kolkata (IST)      ]  (confirmed from Screen 2)
 ```
 
-### Screen 7: User Account
+### Screen 7: Privacy Configuration (observe.toml)
+
+This screen appears after User Account creation and before Installation Summary.
+
+```
+  How LUNA observes your activity
+
+  ● LUNA: These settings control what I notice while you work.
+           You can change all of these later in Settings.
+
+  Context Awareness:
+  [✓] Notice which applications are active
+         LUNA sees: "you are in VS Code" — not your code content
+  [✓] Notice system status (CPU, memory, battery)
+         LUNA sees: "memory is high" — not which apps use it
+  [ ] Notice window titles
+         Disabled by default — may reveal file names
+
+  LUNA never reads file contents, keystrokes, or clipboard.
+  All observation happens locally. Nothing leaves your device.
+
+  [ Learn more ]                          [ Next ]
+```
+
+This screen writes the initial `~/.luna/config/observe.toml` based on user selection (DL-022).
+All options default to the privacy-first setting. The user opts in to additional observation.
+
+### Screen 8: User Account
 
 ```
   Full Name:  [                         ]
@@ -237,9 +265,11 @@ Partition plan (review before writing):
   Estimated time remaining: 2 minutes
 ```
 
-### Screen 10: First Boot Setup (Post-Install)
+### Screen 11: First Boot Setup (Post-Install)
 
-Runs on first actual boot into the installed system:
+Runs on first actual boot into the installed system.
+
+**If internet is available:**
 
 ```
   ●  LUNA online.
@@ -249,15 +279,33 @@ Runs on first actual boot into the installed system:
   LUNA works best with a language model installed locally.
   This is what lets me understand context and have real conversations.
 
-  Model: Phi-3 Mini (3.8B parameters)
-  Size:  2.1 GB
+  Model: Qwen2.5 (3B parameters, 4-bit quantized)
+  Size:  1.7 GB
   Type:  Runs 100% locally. Never leaves your device.
 
-  Download now?    [ Download (2.1 GB) ]   [ Skip for now ]
+  Download now?    [ Download (1.7 GB) ]   [ Skip for now ]
 
   If you skip, LUNA will still work — just without conversation ability.
-  You can install the model later with: luna model install phi3:mini
+  You can install the model later with: luna model install qwen2.5:3b
 ```
+
+**If internet is unavailable (DL-047):**
+
+```
+  ●  LUNA online. Running in limited mode.
+
+  AI model not installed.
+
+  LUNA is active but conversation isn't available yet.
+  When you connect to the internet, run:
+
+    luna model install qwen2.5:3b
+
+  Everything else works normally.         [ Continue ]
+```
+
+The offline screen is non-blocking. Luna Island shows LUNA_AMBER. No error state is shown.
+LUNA does not retry automatically when connectivity is detected — user initiates model install.
 
 ---
 
@@ -284,11 +332,11 @@ Installation payload:
                        luna-settings, luna-text, luna-notif,
                        luna-lock, luna-bar, luna-dock)
 
-  AI model:      ~2.1 GB (optional — downloaded on first boot)
-    phi3:mini via Ollama
+  AI model:      ~1.7 GB (optional — downloaded on first boot)
+    qwen2.5:3b via Ollama
 
   Total base:    ~1.4 GB (without AI model)
-  Total with AI: ~3.5 GB
+  Total with AI: ~3.1 GB
 ```
 
 ### Btrfs Subvolume Layout
@@ -360,6 +408,9 @@ Error scenarios and responses:
 | Bootloader: limine | DL-005 | ✅ Accepted |
 | Filesystem: Btrfs with @, @home, @snapshots subvolumes | DL-027 | ✅ Accepted |
 | AI model: optional at install, offered on first boot | DL-041, DL-042 | ✅ Accepted |
+| Default AI model: Qwen2.5 3B Q4_K_M | DL-046 | ✅ Accepted |
+| First-boot offline behavior: DEGRADED mode + notification | DL-047 | ✅ Accepted |
+| Privacy config screen (observe.toml) in installer | DL-022 | ✅ Accepted |
 | LUNA present during installation (template mode, no LLM) | This document | ✅ Accepted |
 | Dual boot support | v1.5 — not in v1 | 🔵 Draft |
 | Manual partitioning UI | This document (basic), full spec pending | 🔵 Draft |
@@ -381,7 +432,7 @@ Decision not yet finalized.
 
 4. **OEM mode.** Should the installer support an OEM mode (pre-install for hardware vendors)? Vendors would want to image many machines. Must be a Decision Log entry.
 
-5. **Offline AI model.** The default workflow downloads the AI model on first boot (requires internet). Should the ISO ship with the AI model embedded? Adds 2.1 GB to ISO size but enables fully offline installation. Must be a Decision Log entry.
+5. **Offline AI model.** Resolved — DL-047: LUNA starts in DEGRADED mode with a single notification. ISO does not bundle the model. User installs via `luna model install qwen2.5:3b` when online.
 
 ---
 
@@ -397,6 +448,6 @@ Decision not yet finalized.
 
 *Document: `Volume V / 06_installer.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*Version: 0.1-draft*
-*Depends on: Volume II/09_filesystem.md, Volume V/01_shell.md, Volume V/03_package_manager.md, DL-005, DL-027*
+*Version: 0.2*
+*Depends on: Volume II/09_filesystem.md, Volume V/01_shell.md, Volume V/03_package_manager.md, DL-005, DL-022, DL-027, DL-046, DL-047*
 *Informs: Volume V/07_updater.md, Volume VI/06_milestones.md*

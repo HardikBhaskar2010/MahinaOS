@@ -23,7 +23,7 @@ AI model landscape in Mahina:
   │                                                          │
   │  ┌──────────────────────────────────────────────────┐   │
   │  │  Language Models (LLM)                           │   │
-  │  │  Primary: Phi-3 Mini 3.8B (default, 4-bit quant) │   │
+  │  │  Primary: Qwen2.5 3B (default, Q4_K_M)          │   │
   │  │  Secondary: Llama 3.1 8B (user upgrade)          │   │
   │  │  Runtime: Ollama                                  │   │
   │  └──────────────────────────────────────────────────┘   │
@@ -60,34 +60,27 @@ AI model landscape in Mahina:
 ### Default Model: Phi-3 Mini 3.8B
 
 ```
-Model: Phi-3 Mini 3.8B (4-bit quantized)
-Source: Microsoft (MIT License)
+Model: Qwen2.5 3B (4-bit quantized, Q4_K_M)
+Source: Alibaba (Apache 2.0 License)
 Format: GGUF (via Ollama)
+Ollama pull name: qwen2.5:3b
 Quantization: Q4_K_M (4-bit, K-means quantized, medium quality variant)
 
 Resource requirements:
-  RAM:    ~2.5 GB (4-bit quantized, loaded)
-  Disk:   ~2.1 GB (model file)
+  RAM:    ~2.0 GB (4-bit quantized, loaded)
+  Disk:   ~1.7 GB (model file)
   CPU:    Inference via llama.cpp (CPU or GPU)
   VRAM:   Optional — GPU offload if VRAM available (DL-026)
 
-Why Phi-3 Mini:
-  - Small enough to run on 4GB RAM systems with the rest of the OS
-  - Microsoft MIT license — fully permissive for distribution
-  - Strong instruction following for its size
+Why Qwen2.5 3B:
+  - Strong instruction following at the 3B parameter class
+  - 2.0 GB RAM — fits on 8GB systems alongside OS and apps
+  - Apache 2.0 license — fully permissive for distribution
   - Runs via Ollama — no additional integration work
   - Fast response time on CPU (2–4 tokens/sec on modern laptop)
 ```
 
-**DL-006 note:** Phi-3 Mini is listed as `Deprecated` in the decision log (DL-006) because model selection is ongoing. This document updates the recommendation. A new Decision Log entry (post-AR-004) should formalize the v1 default model.
-
-```
-TODO:
-Decision not yet finalized.
-DL-006 marks Phi-3 Mini as the current default but deprecated pending
-final model selection. A new DL entry replacing DL-006 must be created
-before v1 ships. Phi-3 Mini 3.8B Q4_K_M is the current recommendation.
-```
+Default model finalized in DL-046. Supersedes DL-006.
 
 ### Secondary Model: Llama 3.1 8B
 
@@ -121,8 +114,10 @@ LUNA selects the language model at startup using this hierarchy:
   2. If preferred_model not installed: fall back to best available
      (scan Ollama model list via GET /api/tags)
 
-  3. If no models installed: pull phi3:mini automatically on first boot
-     (requires internet connection on first setup — documented in installer)
+  3. If no models installed: luna-ai-d enters MODEL_NOT_INSTALLED state.
+     Luna Island shows LUNA_AMBER.
+     LUNA displays: "AI model not installed. Run 'luna model install' to set up."
+     (DL-047: model is never auto-downloaded without user action)
 
   4. If Ollama fails to connect: luna-ai-d enters DEGRADED mode
      (Context Engine + Presence Engine still run — no LLM functionality)
@@ -131,7 +126,7 @@ LUNA selects the language model at startup using this hierarchy:
 ### Model Performance Targets
 
 ```
-Target response performance for default model (Phi-3 Mini, CPU):
+Target response performance for default model (Qwen2.5 3B, CPU):
 
   First token latency:  < 3 seconds
   Sustained throughput: ≥ 3 tokens/second
@@ -185,19 +180,19 @@ Model storage location:
 # ~/.luna/config/models.toml — LUNA's view of installed models
 
 [models]
-default_llm      = "phi3:mini"
+default_llm      = "qwen2.5:3b"
 preferred_llm    = ""  # user override — empty means use default
 vision_model     = ""  # empty = vision disabled
 tts_model        = ""  # empty = TTS disabled
 stt_model        = ""  # empty = STT disabled
 
 [[models.installed]]
-name     = "phi3:mini"
+name     = "qwen2.5:3b"
 type     = "llm"
 source   = "ollama"
-version  = "3.8B"
+version  = "3B"
 quant    = "Q4_K_M"
-size_gb  = 2.1
+size_gb  = 1.7
 verified = true  # hash verified on download
 
 [[models.installed]]
@@ -217,11 +212,11 @@ verified = true
 
 luna model list
   → "Installed models:"
-    "  phi3:mini     (3.8B, 4-bit)  — 2.1 GB  [default]"
+    "  qwen2.5:3b    (3B, 4-bit)    — 1.7 GB  [default]"
     "  llama3.1      (8B, 4-bit)    — 4.7 GB"
 
-luna model install llama3.1
-  → Calls: ollama pull llama3.1
+luna model install qwen2.5:3b
+  → Calls: ollama pull qwen2.5:3b
   → Verifies hash
   → Updates models.toml
 
@@ -233,9 +228,9 @@ luna model set-default llama3.1
   → Updates preferred_llm in models.toml
 
 luna model status
-  → "Active model: phi3:mini (loaded)"
+  → "Active model: qwen2.5:3b (loaded)"
     "Ollama: running, port 11434"
-    "RAM used by model: 2.4 GB"
+    "RAM used by model: 2.0 GB"
 ```
 
 ---
@@ -397,19 +392,19 @@ Model security rules:
 
 ## Minimum Hardware Requirements
 
-Based on the default model (Phi-3 Mini, 4-bit quantized):
+Based on the default model (Qwen2.5 3B, 4-bit quantized):
 
 ```
 Minimum hardware for AI features to function:
 
   RAM:    8 GB total system RAM
-          (4 GB for OS + applications, 2.5 GB for model, 1.5 GB buffer)
+          (4 GB for OS + applications, 2.0 GB for model, 2 GB buffer)
 
   CPU:    x86-64, with at least 4 cores
           AVX2 support strongly recommended (llama.cpp performance)
 
   Disk:   5 GB free for AI model storage
-          (2.1 GB model + 2 GB working space)
+          (1.7 GB model + 2 GB working space)
 
   GPU:    Not required. Optional for acceleration (DL-026).
           NVIDIA/AMD GPU with ≥ 4 GB VRAM provides significant speedup.
@@ -418,7 +413,7 @@ Recommended hardware for good AI experience:
 
   RAM:    16 GB
   CPU:    Modern 6+ core (Ryzen 5000+, Intel 12th gen+)
-  GPU:    6 GB VRAM (full GPU acceleration for phi3:mini)
+  GPU:    6 GB VRAM (full GPU acceleration for qwen2.5:3b)
 ```
 
 ---
@@ -429,11 +424,11 @@ Recommended hardware for good AI experience:
 |---|---|---|
 | Ollama as the LLM runtime | DL-006 | ✅ Accepted |
 | Dynamic memory — no fixed reservation | DL-042 | ✅ Accepted |
-| Default model: Phi-3 Mini 3.8B | DL-006 (deprecated — needs new entry) | 🟡 Deprecated |
-| Model selection: pending final DL entry | This document | 🔵 Draft |
+| Default model: Qwen2.5 3B Q4_K_M | DL-046 | ✅ Accepted |
+| First-boot offline: DEGRADED mode + notification | DL-047 | ✅ Accepted |
 | No auto-update of AI models | This document | ✅ Accepted |
 | GPU offload optional (not required) | DL-026 | ✅ Accepted |
-| Vision model selection (v2) | This document | 🔵 Draft |
+| Vision model: disabled in v1 | This document | ✅ Accepted |
 | TTS engine: Kokoro TTS | Volume IV/07 | 🔵 Draft |
 | STT engine: Whisper.cpp | Volume IV/07 | 🔵 Draft |
 
@@ -441,14 +436,9 @@ Recommended hardware for good AI experience:
 
 ## Open Questions
 
-```
-TODO:
-Decision not yet finalized.
-```
+1. **Default model final selection.** Resolved — Qwen2.5 3B Q4_K_M. See DL-046.
 
-1. **Default model final selection.** DL-006 is deprecated. A new Decision Log entry must finalize the v1 default LLM. Recommendation: Phi-3 Mini 3.8B Q4_K_M via Ollama. Must be a Decision Log entry.
-
-2. **Model download on first boot.** If no model is installed, LUNA downloads phi3:mini automatically. This requires internet access during first boot. The installer must inform the user of this requirement. What happens if first boot is offline? Must be documented in the installer spec (Volume V/06).
+2. **Model download on first boot.** Resolved — DL-047: LUNA enters DEGRADED mode if offline. No auto-download. User installs via `luna model install qwen2.5:3b`.
 
 3. **AVX2 requirement.** llama.cpp performs best with AVX2. Older CPUs without AVX2 will run extremely slowly. Should Mahina require AVX2 as a minimum hardware feature? Must be a hardware requirements Decision Log entry.
 
@@ -470,6 +460,6 @@ Decision not yet finalized.
 
 *Document: `Volume IV / 10_ai_models.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*Version: 0.1-draft*
-*Depends on: Volume IV/00_luna_runtime.md, DL-006, DL-026, DL-042*
+*Version: 0.2*
+*Depends on: Volume IV/00_luna_runtime.md, DL-006, DL-026, DL-042, DL-046, DL-047*
 *Informs: Volume VII/implementation_roadmap.md*

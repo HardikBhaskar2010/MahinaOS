@@ -23,7 +23,7 @@ lpkg components:
   │                                                             │
   │  ┌──────────────┐  ┌───────────────┐  ┌────────────────┐  │
   │  │  CLI Frontend │  │  D-Bus Service│  │  LunaGUI Dialog│  │
-  │  │  `lpkg ...`  │  │ org.mahina.  │  │  (graphical    │  │
+  │  │  `lpkg ...`  │  │ org.mahina.  │  │  graphical    │  │
   │  │              │  │  pkg`        │  │   confirmations│  │
   │  └──────┬───────┘  └───────┬───────┘  └───────┬────────┘  │
   │         └──────────────────┴──────────────────┘           │
@@ -442,19 +442,14 @@ def install_observe_rules(pkg_id: str, pkg_observe_toml: str):
 | Verification-based repo policy | DL-019 | ✅ Accepted |
 | Graphical privilege escalation | DL-016 | ✅ Accepted |
 | Package format: tar.zst + luna.toml | This document | ✅ Accepted |
-| Package signing: ed25519 or GPG | This document | 🔵 Draft |
+| Package signing: Ed25519 via libsodium | DL-048 | ✅ Accepted |
 | Snapshot retention: 7 days / last 5 | This document | 🧪 Experimental |
 
 ---
 
 ## Open Questions
 
-```
-TODO:
-Decision not yet finalized.
-```
-
-1. **Package signing algorithm.** ed25519 or GPG? GPG is more widely understood; ed25519 is more modern and simpler. Must be a Decision Log entry.
+1. **Package signing algorithm.** Resolved — Ed25519 via libsodium. See DL-048.
 
 2. **LBUILD (package build system).** lpkg installs packages. LBUILD builds them. LBUILD is mentioned in earlier documents but not yet specified. Must have its own document before the repository is operational.
 
@@ -476,8 +471,42 @@ Decision not yet finalized.
 
 ---
 
+---
+
+## Package Security
+
+All lpkg packages, model manifests, and repository metadata are signed using **Ed25519 via libsodium** (DL-048).
+
+```
+Signing infrastructure:
+
+  Algorithm:     Ed25519 (libsodium implementation)
+  Public key:    /etc/luna/keys/mahina-official.pub  (bundled in OS)
+  Signature:     .lpkg.sig file alongside every package archive
+  Key size:      32-byte public key, 64-byte signature
+
+Verification flow (package install):
+  1. lpkg downloads <pkg>.lpkg and <pkg>.lpkg.sig
+  2. lpkg loads /etc/luna/keys/mahina-official.pub
+  3. lpkg verifies signature via libsodium crypto_sign_verify_detached()
+  4. If verification fails: refuse installation, log FATAL security error
+  5. If verification passes: proceed with hash check of archive contents
+
+Verification flow (AI model install — DL-046):
+  1. lpkg reads /etc/luna/models.toml (Ed25519-signed system manifest)
+  2. lpkg verifies manifest signature
+  3. lpkg extracts expected SHA-256 hash for the requested model
+  4. lpkg instructs Ollama to pull model
+  5. lpkg performs SHA-256 hash check on downloaded blob
+  6. If hash fails: delete blob, log FATAL error
+```
+
+GPG is not used anywhere in the Mahina toolchain.
+
+---
+
 *Document: `Volume V / 03_package_manager.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*Version: 0.1-draft*
-*Depends on: DL-003, DL-016, DL-017, DL-018, DL-019, DL-027, Volume II/09_filesystem.md*
+*Version: 0.2*
+*Depends on: DL-003, DL-016, DL-017, DL-018, DL-019, DL-027, DL-048, Volume II/09_filesystem.md*
 *Informs: Volume V/06_installer.md, Volume V/07_updater.md, Volume VI/07_release_process.md*

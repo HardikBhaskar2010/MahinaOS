@@ -72,7 +72,7 @@ LUNA is not a single process. LUNA is a **runtime** — a coordinated set of com
 `luna-ai-d` starts at luna-init Stage 6. It runs for the entire session. It shuts down gracefully at Session teardown (summarizes memory before exit).
 
 **Process characteristics:**
-- Language: TODO — Unconfirmed for v1 (C vs Python). Rust migration planned for v2 (analogous to DL-007). Needs DL entry.
+- Language: **Python** (v1, DL-049). Rust migration planned for v2.
 - Cgroup: `luna-ai.slice`
 - Runs as: the logged-in user (not root)
 - Persistent state: `~/.luna/memory/` and `~/.luna/config/`
@@ -343,16 +343,15 @@ luna-ai-d and luna-island are deliberately separate processes. This means:
 | luna-ai-d communicates with luna-island via D-Bus | Accepted | This document |
 | luna-ai-d runs as the logged-in user (not root) | Accepted | Volume II / 06_memory.md |
 | Memory encryption at rest is a v1 requirement | Accepted | DL-023 |
+| luna-ai-d v1 language: Python (asyncio, self-contained) | Accepted | DL-049 |
+| luna-ai-d v2 migration target: Rust | Accepted | DL-049 |
 | Live2D model for luna-island | Provisional — v1.5 | Volume III / 05_animation_engine.md |
 
 ---
 
 ## Open Questions
 
-```
-TODO:
-Decision not yet finalized.
-```
+## Open Questions
 
 1. **Live2D integration.** v1 luna-island uses static LGP surface transforms. Live2D would replace the rendering model entirely. Must be evaluated as a v1.5 project. License review required.
 
@@ -362,11 +361,36 @@ Decision not yet finalized.
 
 ---
 
+## luna-ai-d Python Implementation (DL-049)
+
+```
+Implementation constraints for luna-ai-d v1:
+
+  Language:     Python 3.12+
+  Concurrency:  asyncio throughout — no blocking calls on the main loop
+  Packaging:    Self-contained venv bundled at /usr/lib/luna-ai-d/
+                No dependency on system Python version
+  Dependencies: ollama          — Ollama REST API client
+                dasbus          — D-Bus integration (asyncio-native)
+                aiofiles        — async file I/O for memory engine
+                toml            — config file parsing
+
+  Performance targets:
+    RAM usage:      ≤ 80 MB (daemon process only, excluding Ollama)
+    Startup time:   ≤ 2 seconds to READY state
+    D-Bus latency:  ≤ 50ms for method calls that don't require LLM
+    LLM first token: ≤ 3 seconds (hardware-dependent, Qwen2.5 3B CPU)
+
+  luna-ai-d does NOT use the C toolchain.
+  It is built and packaged separately from the Makefile/C build system.
+  The luna-ai-d package is an .lpkg containing a bundled Python environment.
+```
+
 ## AI Context
 
-- **`luna-ai-d` owns LUNA's intelligence.** If you are writing AI-decision code, it belongs in `luna-ai-d`.
-- **`luna-island` owns LUNA's appearance.** If you are writing rendering code for the Island surface, it belongs in `luna-island`.
-- These two processes communicate via D-Bus only. Never link them. Never have one call the other's C functions directly.
+- **`luna-ai-d` owns LUNA's intelligence.** If you are writing AI-decision code, it belongs in `luna-ai-d`. It is written in Python (DL-049) using asyncio.
+- **`luna-island` owns LUNA's appearance.** If you are writing rendering code for the Island surface, it belongs in `luna-island` (C, LGP client).
+- These two processes communicate via D-Bus only. Never link them.
 - When implementing a new LUNA behavior: ask "is this a decision (luna-ai-d) or a rendering (luna-island)?" The answer tells you which process it belongs in.
 - The Presence Engine is always on. The Inference Engine is dormant at boot. Never start Ollama at luna-ai-d startup — it starts lazily on first demand (DL-021).
 - `~/.luna/memory/` is exclusive to `luna-ai-d`. No other process reads or writes it. Not luna-island. Not luna-shell. Not any application. This is Core Law II.
@@ -376,8 +400,8 @@ Decision not yet finalized.
 
 *Document: `Volume IV / 00_luna_runtime.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*Version: 0.1-draft*
+*Version: 0.2*
 *Addresses: BLOCKER 4 (LUNA process ownership unclear)*
 *Classification: Canonical entry point for Volume IV*
-*Depends on: non_negotiables.md, decision_log.md (DL-021, DL-023), identity.md, luna_personality.md, 06_memory.md, 08_ipc.md*
+*Depends on: non_negotiables.md, decision_log.md (DL-021, DL-023, DL-049), identity.md, luna_personality.md, 06_memory.md, 08_ipc.md*
 *Informs: All Volume IV documents (context engine, memory engine, conversation, inference)*
