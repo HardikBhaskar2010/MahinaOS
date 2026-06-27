@@ -40,7 +40,7 @@ Legend:
 - [ ] QEMU/KVM virtual machine configured for Mahina development
 - [ ] KVM machine profile: 4 cores, 4 GB RAM, virtio disk, virtio-vga
 - [ ] Build system chosen (Makefile, Meson, or custom) and scaffolded
-- [ ] Git repository initialized and remote pushed (`https://github.com/HardikBhaskar2010/Mahina.git`)
+- [ ] Git repository initialized and remote pushed (`https://github.com/HardikBhaskar2010/MahinaOS.git`)
 - [ ] Directory layout decided: `src/`, `boot/`, `docs/`, `packages/`, `scripts/`
 
 **Done when:** `git clone` + `make` produces a bootable image.

@@ -1,6 +1,6 @@
 # Mahina — Repository Architecture Audit
 **Principal Architect Review**
-**Repository:** https://github.com/HardikBhaskar2010/Mahina
+**Repository:** https://github.com/HardikBhaskar2010/MahinaOS
 **Audit Date:** 2026-06-27
 **Reviewer:** Architecture Audit (Principal Engineer standard)
 
