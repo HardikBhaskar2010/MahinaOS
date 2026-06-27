@@ -1,40 +1,73 @@
-# Mahina OS
+<div align="center">
+  <h1>Mahina OS</h1>
+  <p><i>A modern, lightweight, and AI-native operating system built on Documentation-First Engineering.</i></p>
+</div>
 
-![Mahina Logo](logo.png)
+---
 
-## What is Mahina?
+## 🌙 What is Mahina?
 
-Mahina OS is a modern, lightweight operating system designed for simplicity, speed, and clean architecture. Built strictly according to Documentation-First Engineering, Mahina guarantees that its architecture matches its implementation perfectly.
+Mahina OS is a ground-up initiative to build a clean, deterministic, and highly responsive operating system. Rather than piling on decades of legacy cruft, Mahina is built with strict, documented architectural constraints from day one.
 
-## Features
+It aims to provide:
+1. **Uncompromising Determinism:** Through our custom `luna-init` service manager.
+2. **Beautiful Aesthetics:** Starting from the very first frame of the bootloader (`luna-splash`).
+3. **Deep AI Integration:** A system designed to be operated natively by intelligent agents.
 
-- **luna-init**: A deterministic, dependency-graph based init system.
-- **luna-splash**: Decoupled, zero-malloc boot graphics engine.
-- **LGP (Luna Graphics Protocol)**: A modern display protocol and compositor (In Development).
+## ✨ Features
 
-## Architecture
+- **`luna-init`:** A completely custom PID 1 init system. It uses TOML for service definitions, builds a deterministic dependency graph, detects cycles, and reaps zombies gracefully.
+- **`luna-splash`:** A decoupled boot graphics engine that paints the screen directly via the Linux framebuffer (`/dev/fb0`), completely free of dynamic memory allocation (`malloc`).
+- **LGP (Luna Graphics Protocol):** (In Development) A modern, minimal display protocol designed to replace heavy legacy systems.
+- **Documentation-First:** No code is written unless it is first codified in the Document Control Knowledge Library (DCKL).
 
-Please review our comprehensive Document Control Knowledge Library (DCKL) located in `docs/DCKL/` for the complete architectural specification.
+## 🏗️ Architecture
 
-## Build Instructions
+Mahina's architecture is explicitly defined in the `docs/DCKL/` directory. If you want to understand how the system works, start there. The code exists solely to satisfy the documentation.
+
+### Core Components
+- **Kernel:** Custom-configured Linux kernel.
+- **Bootloader:** Limine.
+- **Init System:** `luna-init` (Custom C17).
+- **Boot Splash:** `luna-splash` (Custom C17).
+
+## 🛠️ Build Instructions
+
+Mahina uses a standard Makefile toolchain. You must be on Linux or WSL2 to build the final disk image.
+
+### Prerequisites
+- Clang/LLVM toolchain
+- `make`
+- QEMU (for virtualization testing)
+- `mtools`, `xorriso`, `parted` (for ISO/IMG generation)
+
+### Compiling
 
 ```bash
+# Build luna-init, luna-splash, and luna-init-ctl
 make all
+
+# Run static analysis and linting (Required)
+make lint
+
+# Run unit tests with ASan and UBSan
+make test-unit
+
+# Build the disk image and boot it in QEMU
 make run-qemu
 ```
 
-## Documentation
+## 🗺️ Roadmap
 
-See the `docs/` folder for architectural decisions, roadmaps, and the full DCKL.
+Mahina is currently in the **Phase 1: Boot Aesthetics** stage. We have successfully implemented a deterministic init system and are now finalizing the graphical boot splash.
 
-## Roadmap
+See [ROADMAP.md](ROADMAP.md) for a high-level overview, or dive into `docs/DCKL/Volume VII - Implementation Roadmap/` for specific engineering milestones.
 
-See `ROADMAP.md` for a high-level overview or `docs/DCKL/Volume VII - Implementation Roadmap/` for specific engineering milestones.
+## 🤝 Contributing
 
-## Contributing
+We welcome contributions, but we have strict guidelines to maintain architectural purity. 
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting a Pull Request.
 
-We welcome contributions! See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+## 📜 License
 
-## License
-
-MIT License. See `LICENSE` and `COPYRIGHT.md` for details.
+Mahina OS is licensed under the MIT License. See [LICENSE](LICENSE) and [COPYRIGHT.md](COPYRIGHT.md) for details.
