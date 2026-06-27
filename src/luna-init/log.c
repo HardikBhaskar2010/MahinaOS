@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * log.c — Mahina Early Logger Implementation
  * Authority: Volume II / 11_logging.md
  * Authority: Volume VI / 01_coding_standards.md

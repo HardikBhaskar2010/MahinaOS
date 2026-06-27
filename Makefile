@@ -41,8 +41,10 @@ SCRIPTS_DIR    := scripts
 
 LUNA_INIT_SRC  := $(SRC_DIR)/luna-init
 LUNA_CTL_SRC   := $(SRC_DIR)/luna-init-ctl
+LUNA_SPLASH_SRC := $(SRC_DIR)/luna-splash
 BUILD_INIT     := $(BUILD_DIR)/luna-init
 BUILD_CTL      := $(BUILD_DIR)/luna-init-ctl
+BUILD_SPLASH   := $(BUILD_DIR)/luna-splash
 
 # ---------------------------------------------------------------------------
 # Compiler flags
@@ -106,9 +108,21 @@ LUNA_INIT_SOURCES := \
     $(LUNA_INIT_SRC)/panic.c \
     $(LUNA_INIT_SRC)/console.c \
     $(LUNA_INIT_SRC)/ctl.c \
+    $(LUNA_INIT_SRC)/splash.c \
     $(LUNA_INIT_SRC)/main.c
 
 LUNA_INIT_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNA_INIT_SOURCES))
+
+# ---------------------------------------------------------------------------
+# luna-splash sources
+# ---------------------------------------------------------------------------
+
+LUNA_SPLASH_SOURCES := \
+    $(LUNA_SPLASH_SRC)/render.c \
+    $(LUNA_SPLASH_SRC)/ipc.c \
+    $(LUNA_SPLASH_SRC)/main.c
+
+LUNA_SPLASH_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNA_SPLASH_SOURCES))
 
 # ---------------------------------------------------------------------------
 # luna-init-ctl sources
@@ -136,14 +150,16 @@ TEST_SOURCES := \
 # Primary targets
 # ---------------------------------------------------------------------------
 
-.PHONY: all luna-init luna-init-ctl image run-qemu clean \
+.PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint help
 
-all: luna-init luna-init-ctl
+all: luna-init luna-init-ctl luna-splash
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
 luna-init-ctl: $(BUILD_DIR)/luna-init-ctl/luna-init-ctl
+
+luna-splash: $(BUILD_DIR)/luna-splash/luna-splash
 
 # ---------------------------------------------------------------------------
 # luna-init binary (statically linked — mandatory per 04_init_system.md)
@@ -171,6 +187,20 @@ $(BUILD_DIR)/luna-init-ctl/luna-init-ctl: $(LUNA_CTL_OBJECTS) | $(BUILD_DIR)/lun
 $(BUILD_DIR)/luna-init-ctl/%.o: $(LUNA_CTL_SRC)/%.c | $(BUILD_DIR)/luna-init-ctl
 	@echo "  CC      $<"
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
+
+# ---------------------------------------------------------------------------
+# luna-splash binary (statically linked for early boot)
+# ---------------------------------------------------------------------------
+
+$(BUILD_DIR)/luna-splash/luna-splash: $(LUNA_SPLASH_OBJECTS) | $(BUILD_DIR)/luna-splash
+	@echo "  LINK    $@"
+	$(CC) $(CFLAGS_STATIC) -o $@ $^
+	@echo "  SIZE    luna-splash"
+	@size $@
+
+$(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
+	@echo "  CC      $<"
+	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -c -o $@ $<
 
 # ---------------------------------------------------------------------------
 # Disk image (requires Linux / WSL2 — uses loopback devices)
@@ -281,14 +311,16 @@ lint:
 # ---------------------------------------------------------------------------
 # Directory creation
 # ---------------------------------------------------------------------------
-
 $(BUILD_DIR)/luna-init:
 	@mkdir -p $@
 
 $(BUILD_DIR)/luna-init-ctl:
 	@mkdir -p $@
 
-$(BUILD_DIR)/tests:
+$(BUILD_DIR)/luna-splash:
+	@mkdir -p $@
+
+$(BUILD_DIR)/tests/vendor:
 	@mkdir -p $@
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * service.c — Service File Parser
  * Authority: Volume II / 04_init_system.md §Service File Format
  */

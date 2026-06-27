@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
 #ifndef MAHINA_CONSOLE_H
 #define MAHINA_CONSOLE_H
 

@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * main.c — luna-init Entry Point (PID 1)
  * Authority: Volume II / 04_init_system.md
  * Authority: Volume II / 02_boot_flow.md
@@ -28,6 +35,7 @@
 #include "service.h"
 #include "shutdown.h"
 #include "signal.h"
+#include "splash.h"
 #include "supervisor.h"
 
 #include <errno.h>
@@ -97,6 +105,7 @@ int main(void) {
 
     luna_log_set_stage(LUNA_STAGE_KERNEL);
     LUNA_INFO("luna-init", "Stage 1: Initializing event loop and signal handling");
+    splash_start();
 
     int epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0) {
@@ -119,6 +128,7 @@ int main(void) {
 
     luna_log_set_stage(LUNA_STAGE_FILESYSTEM);
     LUNA_INFO("luna-init", "Stage 2: Mounting filesystems");
+    splash_update("Mounting filesystems", 20);
 
     /* Early mounts already done above — now process fstab for /tmp /run etc. */
     mount_result_t mresult = mount_fstab(FSTAB_PATH);
@@ -130,6 +140,7 @@ int main(void) {
 
     luna_log_set_stage(LUNA_STAGE_HOOKS);
     LUNA_INFO("luna-init", "Stage 3: Running early hooks");
+    splash_update("Running early hooks", 40);
 
     hostname_set(HOSTNAME_PATH);
 
@@ -158,6 +169,7 @@ int main(void) {
 
     luna_log_set_stage(LUNA_STAGE_SERVICES);
     LUNA_INFO("luna-init", "Stage 4: Loading service definitions");
+    splash_update("Loading service definitions", 60);
 
     int svc_count = service_load_all(SERVICES_DIR);
     if (svc_count < 0) {
@@ -169,6 +181,7 @@ int main(void) {
             panic_drop_to_shell("Service dependency graph has a cycle");
         }
         LUNA_INFO("luna-init", "Stage 4: Starting %d services", svc_count);
+        splash_update("Starting services", 80);
         supervisor_start_all();
     }
 
@@ -193,6 +206,7 @@ int main(void) {
 
     LUNA_INFO("luna-init", "Stage 0 (v0.1) boot complete. "
               "Stages 5-7 pending future milestones.");
+    splash_stop();
 
     /* ═══ Print welcome banner and drop to shell in Stage 0 ══════════════
      *

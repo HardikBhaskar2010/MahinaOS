@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * console.c — Console Output and Welcome Message
  * Authority: Volume VII / 01_implementation_roadmap.md §Stage 0 Success Criteria
  */

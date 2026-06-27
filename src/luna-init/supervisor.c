@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * supervisor.c — Service Supervisor Implementation
  * Authority: Volume II / 04_init_system.md §Service Supervisor
  */

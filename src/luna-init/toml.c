@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * toml.c — Minimal TOML Parser Implementation
  * Authority: Volume VI / 01_coding_standards.md §5 (bounded buffers, fuzzing)
  * Authority: Volume II / 04_init_system.md, Volume II / 02_boot_flow.md
@@ -352,7 +359,7 @@ toml_doc_t *toml_load_file(const char *path, toml_error_t *out_error) {
         return NULL;
     }
 
-    char *buf = malloc((size_t)st.st_size + 1);
+    char *buf = calloc(1, (size_t)st.st_size + 1);
     if (!buf) { close(fd); if (out_error) *out_error = TOML_ERR_IO; return NULL; }
 
     ssize_t nread = read(fd, buf, (size_t)st.st_size);

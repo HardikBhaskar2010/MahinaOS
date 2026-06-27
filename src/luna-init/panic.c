@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * panic.c — Panic Handler Implementation
  * Authority: Volume II / 04_init_system.md §Fail-Fast at PID 1
  */

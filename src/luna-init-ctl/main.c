@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * luna-init-ctl/main.c — Control CLI for luna-init
  * Authority: Volume II / 04_init_system.md §Control Interface — luna-init-ctl
  *

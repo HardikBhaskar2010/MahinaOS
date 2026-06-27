@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * mount.c — Filesystem Mount Manager Implementation
  * Authority: Volume II / 02_boot_flow.md §Stage 2
  * Authority: Volume II / 09_filesystem.md

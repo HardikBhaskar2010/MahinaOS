@@ -1,4 +1,11 @@
 /*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
  * ctl.c — luna-init Control Socket Server Implementation
  * Authority: Volume II / 04_init_system.md §Control Interface
  *
