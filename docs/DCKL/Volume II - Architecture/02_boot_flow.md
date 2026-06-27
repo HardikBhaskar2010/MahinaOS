@@ -180,7 +180,7 @@ This must be resolved before boot system implementation begins.
 [[mount]]
 device = "/dev/sda1"
 mountpoint = "/"
-fstype = "ext4"
+fstype = "btrfs"
 options = ["rw", "relatime"]
 
 [[mount]]
@@ -274,18 +274,10 @@ All motion types above are from the locked Motion Vocabulary. No other motion ty
 
 **Framebuffer-to-compositor handoff:**
 
-```
-TODO:
-Decision not yet finalized.
-Reason: The handoff technique between the framebuffer boot splash and the
-LGP compositor is undecided.
-Consideration A: Compositor claims framebuffer device directly; luna-init
-                 rendering loop detects this and terminates.
-Consideration B: Accept a single-frame visual transition.
-Consideration C: The compositor is a framebuffer client from the start,
-                 and the splash is rendered by the compositor directly.
-This decision must be made in Volume III / 02_rendering_pipeline.md.
-```
+Per DL-043, LunaOS accepts a brief visual transition (single black frame, ~16ms at 60Hz) between the luna-init framebuffer boot splash and the LGP compositor's first frame.
+- The boot splash renderer (luna-init) stops rendering before the compositor takes over.
+- The lgp-compositor's first frame is its own rendered output.
+- No architectural complexity is introduced to eliminate this cut.
 
 ### Stage 6 — Shell and LUNA Presence Engine
 

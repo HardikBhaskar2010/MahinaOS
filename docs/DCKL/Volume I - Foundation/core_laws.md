@@ -36,9 +36,9 @@ No component ships in LunaOS without a clear answer to:
 
 ### The Distro Exception
 
-We do not compile our own Wayland protocol. We do not write our own C library. We do not write a kernel scheduler from scratch. The law is about *understanding and ownership*, not reinvention for its own sake.
+We do not write our own C library. We do not write a kernel scheduler from scratch. The law is about *understanding and ownership*, not reinvention for its own sake.
 
-Using Hyprland is fine — we understand exactly what it does and have explicit hooks into its IPC. Blindly pulling a random dependency because it solved a problem in a Stack Overflow post is not fine.
+Using well-understood lower-level abstractions (like DRM/KMS) is fine — we understand exactly what they do and they provide the hardware interface for LGP. Blindly pulling a random dependency because it solved a problem in a Stack Overflow post is not fine.
 
 ---
 

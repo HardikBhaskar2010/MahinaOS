@@ -70,8 +70,7 @@ Legend:
 - [ ] Enable: DRM for target GPU (virtio-vga for QEMU, then Intel/AMD later)
 - [ ] Enable: devtmpfs (CONFIG_DEVTMPFS, CONFIG_DEVTMPFS_MOUNT)
 - [ ] Enable: tmpfs (CONFIG_TMPFS)
-- [ ] Enable: ext4 (CONFIG_EXT4_FS)
-- [ ] Enable: Btrfs (CONFIG_BTRFS_FS) — provisional (DL-011)
+- [ ] Enable: Btrfs (CONFIG_BTRFS_FS) (DL-027)
 - [ ] Enable: AppArmor (CONFIG_SECURITY_APPARMOR)
 - [ ] Enable: seccomp (CONFIG_SECCOMP, CONFIG_SECCOMP_FILTER)
 - [ ] Enable: POSIX message queues (CONFIG_POSIX_MQUEUE)
@@ -89,7 +88,7 @@ Legend:
 ### 0.4 — Root Filesystem Layout
 
 - [ ] Disk image created: partition table (GPT), EFI partition, root partition
-- [ ] Root filesystem formatted (ext4 initially — Btrfs pending DL-011 resolution)
+- [ ] Root filesystem formatted (Btrfs, per DL-027)
 - [ ] Standard directories created: `/bin`, `/sbin`, `/usr`, `/lib`, `/etc`, `/var`, `/run`, `/tmp`, `/proc`, `/sys`, `/dev`, `/boot`
 - [ ] Symlinks created: `/bin → /usr/bin`, `/sbin → /usr/sbin`, `/lib → /usr/lib` (if /usr merge adopted)
 - [ ] `/etc/fstab` written: root, /boot/efi, /tmp (tmpfs), /run (tmpfs)
@@ -598,16 +597,16 @@ Update this summary every time a stage is completed.
 
 ## Decision Log Items Required Before Stage 2 Begins
 
-These decisions are **blocking** — Stage 2 cannot start without them:
+These decisions were **blocking**, but have now been resolved:
 
-| Decision needed | Blocks |
-|---|---|
-| LGP wire format (TLV binary confirmed?) | 3.1 — Full LGP protocol |
-| GPU backend (Vulkan primary + EGL fallback) | 2.2 — lgp-render |
-| Software renderer for Stage 2 (yes/no) | 2.2 — lgp-render initial backend |
-| Root filesystem type (ext4 or Btrfs) | 0.4 — Root filesystem |
-| Default typeface selection | 3.3 — LunaGUI text rendering |
-| Text rendering library (FreeType + HarfBuzz) | 3.3 — LunaGUI text rendering |
+| Decision needed | Blocks | Status |
+|---|---|---|
+| LGP wire format (TLV binary confirmed?) | 3.1 — Full LGP protocol | ✅ Resolved (DL-025) |
+| GPU backend (Vulkan primary + EGL fallback) | 2.2 — lgp-render | ✅ Resolved (DL-026) |
+| Software renderer for Stage 2 (yes/no) | 2.2 — lgp-render initial backend | ✅ Resolved (DL-026) |
+| Root filesystem type (ext4 or Btrfs) | 0.4 — Root filesystem | ✅ Resolved (DL-027) |
+| Default typeface selection | 3.3 — LunaGUI text rendering | ✅ Resolved (DL-028) |
+| Text rendering library (FreeType + HarfBuzz) | 3.3 — LunaGUI text rendering | ✅ Resolved (DL-029) |
 
 ---
 

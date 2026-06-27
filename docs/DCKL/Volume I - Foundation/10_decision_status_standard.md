@@ -106,31 +106,31 @@ The following is the canonical status assignment for all existing Decision Log e
 
 | DL # | Title | Status |
 |---|---|---|
-| DL-001 | Rolling Release Model | ✅ Accepted |
-| DL-002 | Init System: luna-init (custom C) | ✅ Accepted |
-| DL-003 | Package Manager: lpkg (custom) | ✅ Accepted |
-| DL-004 | Compositor: Hyprland v1 → custom LGP v2 | ❌ Superseded by DL-004R |
-| DL-004R | Compositor: Full LGP (no Wayland/Hyprland) | ✅ Accepted |
-| DL-005 | AI Backend: Ollama local-first | ✅ Accepted |
-| DL-006 | AI Model: Phi-3 Mini default | 🟡 Deprecated (model selection ongoing) |
-| DL-007 | Language: C v1, Rust migration v2 | ✅ Accepted |
-| DL-008 | Config format: TOML system-wide | ✅ Accepted |
-| DL-009 | No systemd | ✅ Accepted |
-| DL-010 | Decentralized file-based logging | ✅ Accepted |
-| DL-011 | Filesystem: Btrfs preferred, ext4 fallback | ❌ Superseded by DL-027 |
-| DL-012 | EFI partition: FAT32 at /boot/efi | ✅ Accepted |
-| DL-013 | Wireless backend criteria defined | ❌ Superseded by DL-036 |
-| DL-014 | DNS: NetworkManager passthrough | ✅ Accepted |
-| DL-015 | NTP: existing Linux service | ✅ Accepted |
-| DL-016 | Privilege escalation: LUNA dialog | ✅ Accepted |
-| DL-017 | Package install: per-user by default | ✅ Accepted |
-| DL-018 | Package install: atomic transactions | ✅ Accepted |
-| DL-019 | Package signing: GPG or ed25519 | 🔵 Draft (signature algorithm undecided) |
-| DL-020 | Third-party app sandboxing: AppArmor | ✅ Accepted |
-| DL-021 | AI Runtime: Presence Engine (boot) + LLM (lazy) | ✅ Accepted |
-| DL-022 | Observation: install-time observe.toml | ✅ Accepted |
-| DL-023 | AI memory encryption: v1 requirement | ✅ Accepted |
-| DL-024 | Success criteria: boot time + AI presence | ✅ Accepted |
+| DL-001 | No Upstream Distro Base | ✅ Accepted |
+| DL-002 | Init System: luna-init in C | ✅ Accepted |
+| DL-003 | Package Manager: lpkg in Python (v1) | ✅ Accepted |
+| DL-004 | Compositor: Hyprland (v1) → wlroots custom (v2) | ❌ Superseded by DL-004R |
+| DL-004R | Graphics Architecture — Hybrid Model | ✅ Accepted |
+| DL-005 | Bootloader: limine (v1) | ✅ Accepted |
+| DL-006 | AI Runtime: Ollama | ✅ Accepted |
+| DL-007 | C Library: glibc → musl (planned) | ✅ Accepted |
+| DL-008 | Config Format: TOML | ✅ Accepted |
+| DL-009 | Kernel Version: Linux 6.6.x LTS | ✅ Accepted |
+| DL-010 | LUNA.AI Port: 7734 | ✅ Accepted |
+| DL-011 | Root Filesystem — Snapshot-Capable Strategy | ❌ Superseded by DL-027 |
+| DL-012 | EFI Partition Layout | ✅ Accepted |
+| DL-013 | Wireless Backend | ❌ Superseded by DL-036 |
+| DL-014 | DNS Strategy | ✅ Accepted |
+| DL-015 | Time Synchronization | ✅ Accepted |
+| DL-016 | Package Privilege Escalation | ✅ Accepted |
+| DL-017 | Package Installation Scope | ✅ Accepted |
+| DL-018 | Package Transaction Rollback | ✅ Accepted |
+| DL-019 | Repository Policy | ✅ Accepted |
+| DL-020 | Third-Party Application Isolation | ✅ Accepted |
+| DL-021 | AI Runtime Architecture — Two Independent Systems | ✅ Accepted |
+| DL-022 | Context Service | ✅ Accepted |
+| DL-023 | Persistent Memory | ✅ Accepted |
+| DL-024 | LunaOS Success Criteria | ✅ Accepted |
 | DL-025 | LGP Wire Format — TLV Binary | ✅ Accepted |
 | DL-026 | GPU Backend Strategy — Staged Implementation | ✅ Accepted |
 | DL-027 | Root Filesystem — Btrfs | ✅ Accepted |

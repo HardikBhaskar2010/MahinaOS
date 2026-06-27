@@ -26,12 +26,12 @@ This is what separates LunaOS from a rice. When someone asks "what is that proce
 - We track our own kernel `.config` in git — it represents deliberate decisions
 - We write `luna-init` rather than adopt systemd, OpenRC, or s6
 - We write `lpkg` rather than adopt pacman or apt
-- When we use upstream tools (Hyprland, Ollama, PipeWire), we know exactly what they do and why we chose them
+- When we use upstream tools (Ollama, PipeWire), we know exactly what they do and why we chose them
 
 **What this does NOT mean:**
 - We don't rewrite the kernel
 - We don't rewrite glibc
-- We don't write our own Wayland protocol
+- LGP is a ground-up protocol tailored specifically for LunaOS.
 - Ownership is about understanding and intentionality, not reinventing everything
 
 ---

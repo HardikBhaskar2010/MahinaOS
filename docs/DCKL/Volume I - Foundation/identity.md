@@ -118,9 +118,9 @@ State: Error / attention required
 
 ### Technical Notes
 
-Luna Island is rendered as a Wayland layer-shell surface above the compositor. It is not a widget. It is not part of the status bar. It exists in its own compositor layer, always on top, always accessible, never blocking.
+Luna Island is rendered as an LGP LUNA_ISLAND surface above the compositor. It is not a widget. It is not part of the status bar. It exists in its own compositor layer, always on top, always accessible, never blocking.
 
-Implementation: Wayland `zwlr_layer_shell_v1` protocol.
+Implementation: LGP LUNA_ISLAND protocol.
 
 ---
 

@@ -66,6 +66,7 @@ Reader Rule:    Any component may read public state without
 | System logs | luna-init (coordinates) | `luna-init` | Files in `/var/log/luna-init/` | All processes write to log API |
 | Boot sequence | luna-init | `luna-init` | Internal — no external interface | — |
 | Compositor crash recovery | luna-init | `luna-init` | SIGCHLD detection, automatic restart | Compositor + all LGP clients |
+| Screen lock | luna-lock | `luna-lock` | `LAYER_SYSTEM_MODAL` surface | User input |
 
 ---
 
@@ -86,17 +87,7 @@ State machine:
               ──→ HAS_CONTENT (new write replaces previous)
 ```
 
-```
-TODO:
-Decision not yet finalized.
-Reason: The LGP clipboard protocol has not been designed.
-Options:
-  A: LGP protocol extension: LGP_SET_CLIPBOARD, LGP_REQUEST_CLIPBOARD
-  B: D-Bus service: org.lunaos.clipboard
-  C: Implement XDG clipboard spec (xdg-portal) for compatibility
-Option C is recommended for compatibility with third-party apps.
-Must be a Decision Log entry. Target: Stage 3 (Living Desktop).
-```
+Per **DL-033**, the clipboard is implemented as the LGP protocol extension `lgp_ext_clipboard_v1`. Applications request clipboard write via `LGP_CLIPBOARD_SET` and read via `LGP_CLIPBOARD_GET`. The Permission Engine governs access. D-Bus clipboard services are not used.
 
 ---
 
@@ -219,15 +210,7 @@ Session state machine:
 
 The accessibility tree is maintained by LunaGUI inside each application process. There is no separate accessibility daemon in v1.
 
-```
-TODO:
-Decision not yet finalized.
-Reason: LunaOS accessibility architecture has not been fully specified.
-v1 minimum: keyboard navigation (LunaGUI in-process).
-v1.5 target: AT-SPI2 D-Bus interface so screen readers can interrogate
-              the accessibility tree from outside the application process.
-This requires luna-a11y daemon or an AT-SPI2 bridge. Must be a Decision Log entry.
-```
+Per **DL-040**, LunaOS exposes accessibility information via **AT-SPI2**. v1 implements full keyboard navigation in all LunaGUI widgets. v1.5 targets an AT-SPI2 D-Bus bridge allowing external screen readers to interrogate the widget tree.
 
 ---
 
@@ -281,15 +264,9 @@ TODO:
 Decision not yet finalized.
 ```
 
-1. **Clipboard protocol.** LGP extension vs. D-Bus vs. xdg-portal. Must be a Decision Log entry.
+1. **Power management.** `luna-power` is named as the owner but this process does not yet have a specification. Target: Volume V.
 
-2. **Screen lock.** Who owns the lock screen surface and the authentication challenge? Not yet assigned. Candidates: luna-init (highest trust), or a dedicated `luna-lock` process. Must be a Decision Log entry.
-
-3. **Power management.** `luna-power` is named as the owner but this process does not yet have a specification. Target: Volume V.
-
-4. **Accessibility (v1.5).** AT-SPI2 bridge — in-process or separate daemon? Must be a Decision Log entry before v1.5 planning.
-
-5. **luna-notif and luna-island badge relationship.** luna-island shows a badge count (a number of pending notifications). Does luna-notif send this count via D-Bus, or does luna-island read notification count directly? Ownership rule says luna-notif owns notification state — so luna-notif must publish the count via D-Bus. Confirm.
+2. **luna-notif and luna-island badge relationship.** luna-island shows a badge count (a number of pending notifications). Does luna-notif send this count via D-Bus, or does luna-island read notification count directly? Ownership rule says luna-notif owns notification state — so luna-notif must publish the count via D-Bus. Confirm.
 
 ---
 

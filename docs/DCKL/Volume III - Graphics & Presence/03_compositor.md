@@ -104,18 +104,7 @@ luna-init Stage 5:
 
 Before step 8, no LGP clients can connect. Stage 6 components (luna-shell, luna-island) wait for the socket to appear before connecting.
 
-```
-TODO:
-Decision not yet finalized.
-Reason: How Stage 6 components detect compositor readiness has not been specified.
-Options:
-  A: Poll for /run/lgp/compositor.sock existence.
-  B: luna-init sends a D-Bus signal (compositor-ready) after receiving the
-     COMPOSITOR_READY signal from lgp-compositor.
-  C: luna-init writes a sentinel file /run/luna-compositor-ready.
-Option B is cleanest (uses the existing D-Bus event bus). Requires D-Bus to be
-already running (Stage 4 — yes, it is). Must be a Decision Log entry.
-```
+Per **DL-031**, the LGP compositor signals readiness by publishing a D-Bus signal `org.lunaos.compositor.Ready`. Stage 6 components wait for this signal before connecting to the LGP socket.
 
 ### Shutdown Sequence
 
@@ -214,17 +203,7 @@ Applications request a layer via `LGP_SET_LAYER`. The compositor validates that 
 
 The compositor reads raw input from the Linux input subsystem (via libinput or direct `evdev` reads):
 
-```
-TODO:
-Decision not yet finalized.
-Reason: Whether to use libinput or raw evdev has not been decided.
-libinput: higher-level, handles device quirks, provides gesture recognition.
-           External dependency but well-understood (Law I permits it).
-evdev raw: total control, more code to write.
-Recommendation: libinput — it is the direction modern Linux input is moving
-and it significantly reduces device quirk handling code.
-Must be a Decision Log entry.
-```
+Per **DL-032**, the compositor uses **libinput** for all input device management. No other process accesses `/dev/input/event*` directly.
 
 **Pointer (mouse/trackpad) routing:**
 1. Compositor maintains a global pointer position in compositor coordinate space
@@ -359,15 +338,9 @@ TODO:
 Decision not yet finalized.
 ```
 
-1. **Compositor readiness detection.** How Stage 6 components know the compositor is ready. Option B (D-Bus signal) is recommended. Must be a Decision Log entry.
+1. **CPU affinity for render thread.** Performance tuning question for reference hardware validation.
 
-2. **Input backend.** libinput vs. raw evdev. Recommendation: libinput. Must be a Decision Log entry.
-
-3. **CPU affinity for render thread.** Performance tuning question for reference hardware validation.
-
-4. **Multi-head surface spanning.** Behavior when an application window spans two monitors is not fully specified. Does the compositor clip it? Render it on both? Must be specified before multi-monitor support is declared.
-
-5. **Crash recovery re-connection protocol.** When the compositor restarts, how do shell components know to reconnect? They need a readiness signal from the new compositor instance. Option B (D-Bus signal again) applies here too.
+2. **Multi-head surface spanning.** Behavior when an application window spans two monitors is not fully specified. Does the compositor clip it? Render it on both? Must be specified before multi-monitor support is declared.
 
 6. **Per-client memory limits.** Should the compositor limit how much shared memory a single client can allocate? Relevant for sandboxed third-party applications (DL-020). Must be specified in the security architecture update.
 

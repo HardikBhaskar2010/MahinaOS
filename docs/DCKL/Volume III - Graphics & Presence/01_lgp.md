@@ -159,30 +159,7 @@ document decides otherwise.
 
 ### Message Format
 
-```
-TODO:
-Decision not yet finalized.
-Reason: LGP wire format has not been specified.
-This is the most critical open question in Volume III.
-The format must be decided before any LGP implementation can begin.
-
-Design constraints that ARE decided:
-  - Binary protocol (not text/JSON) for performance
-  - Fixed-size header with variable-length payload
-  - Little-endian byte order (x86_64 target hardware)
-  - Message types cover: surface creation/destruction, buffer commit,
-    frame requests, motion commands, semantic color declarations,
-    input event delivery, compositor events
-
-Candidate approaches:
-  A: Custom binary framing (similar in spirit to X11 protocol)
-  B: Cap'n Proto or FlatBuffers for zero-copy message parsing
-  C: Simple TLV (type-length-value) framing with a custom schema
-Option C is the leading candidate: simple enough to implement in C
-(luna-init/compositor is C), easy to parse, no external schema compiler.
-
-This must be the first Decision Log entry before Volume III implementation.
-```
+Per **DL-025**, LGP uses **TLV (Type-Length-Value)** binary framing for all wire messages. Each message consists of a 1-byte type field, a 4-byte length field, and an N-byte payload. No external serialization framework is required. This provides append-compatible message evolution, excellent hex-dump debuggability, and a minimal parser footprint.
 
 ### Core Message Types (Conceptual)
 
@@ -291,29 +268,10 @@ The compositor performs all input routing. Applications do not receive input eve
 
 ### GPU Backend
 
-```
-TODO:
-Decision not yet finalized.
-Reason: The compositor GPU backend has not been decided.
-This decision determines the entire rendering pipeline architecture.
-
-Options:
-  A: Vulkan — modern, explicit API, high performance ceiling.
-     Requires more code to initialize and manage.
-     Best long-term choice for a from-scratch compositor.
-  B: OpenGL/EGL — more portable, simpler to prototype with.
-     Mature driver support. Higher API overhead.
-  C: Software renderer first (v1), GPU acceleration later.
-     Fastest to implement. Does not meet Living Interface motion quality goals
-     on typical hardware. Not recommended for v1.
-
-Current direction: Vulkan as the target. OpenGL/EGL as a fallback path
-for hardware without Vulkan support.
-
-This must be the second Decision Log entry before Volume III implementation,
-after LGP wire format.
-This is equivalent to the GPU backend question in Discussion_Session_3.md.
-```
+Per **DL-026**, the GPU backend is implemented in two stages:
+- **Stage 2:** Software renderer (CPU blit to dumb framebuffer). Proves the pipeline and protocol.
+- **Stage 3:** Vulkan as the primary GPU renderer. OpenGL/EGL as a fallback.
+The compositor communicates exclusively with the `lgp-render` abstraction layer.
 
 The compositor interfaces with the GPU via the Linux kernel's **DRM/KMS subsystem**:
 - DRM (Direct Rendering Manager) — manages GPU command submission
@@ -505,9 +463,8 @@ This section documents how LGP implements the conceptual contract defined in `li
 | Compositor owns DRM device exclusively | This document | Accepted |
 | Frame timing: compositor-driven callback model | This document | Accepted |
 | Surface types: SYSTEM_CHROME, LUNA_ISLAND, APPLICATION_WINDOW, CANVAS_SURFACE | This document | Provisional |
-| GPU backend: Vulkan target, OpenGL/EGL fallback | This document | Provisional — requires DL entry |
-| LGP wire format: TLV binary, custom schema | This document | Provisional — requires DL entry |
-
+| LGP wire format: TLV binary, custom schema | DL-025 | Accepted |
+| GPU backend: Vulkan primary, OpenGL/EGL fallback | DL-026 | Accepted |
 ---
 
 ## Open Questions
@@ -517,9 +474,7 @@ TODO:
 Decision not yet finalized.
 ```
 
-1. **LGP wire format.** TLV binary is the current direction. Must be formally decided and recorded as a Decision Log entry before implementation. This is the highest-priority open question in all of Volume III.
 
-2. **GPU backend.** Vulkan (primary) + OpenGL/EGL (fallback). Must be a Decision Log entry. See also Discussion_Session_3.md context (GPU controls are a Performance Lab subsystem — the GPU backend choice affects what the Performance Lab can expose).
 
 3. **DMA-BUF for GPU-accelerated canvas surfaces.** CPU shared memory works for LunaGUI apps. GPU-rendered CANVAS_SURFACE types need DMA-BUF. Must be resolved in `02_rendering_pipeline.md`.
 

@@ -268,7 +268,7 @@ The explicit cgroup policy above builds on top of autogroup — it provides fine
 | PREEMPT_RT evaluation | v1.5 | Measure compositor latency under Ollama load; decide RT patch necessity |
 | cpu.weight tuning | v1 | Validate initial weight values under real workloads |
 | BFQ I/O scheduler adoption | v1 | Pair with io.weight for complete CPU+I/O resource control |
-| Per-app cgroup assignment | v1.5 | Luna shell classifies launched applications into appropriate slices |
+| Per-app cgroup assignment | v1.5 | luna-shell classifies launched applications into appropriate slices |
 | SCHED_FIFO for compositor render thread | v1.5 | If CFS scheduling produces unacceptable frame time variance |
 
 ---

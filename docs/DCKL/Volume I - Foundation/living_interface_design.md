@@ -165,7 +165,7 @@ This document makes no new architectural decisions. The following are **inherite
 | Expression Layer priority order (1–7) | `luna_personality.md` | Locked (LUNA-specific; generalized here) |
 | Luna Island is the canonical surface for LUNA's expression | `identity.md` | Locked |
 | New motion types require an amendment before use anywhere | `core_laws.md` Amendments | Locked |
-| Compositor strategy: Hyprland (v1) → custom wlroots (v2) | `decision_log.md` DL-004 | Accepted (relevant because it bounds what Volume III can implement in v1) |
+| Compositor strategy: Full LGP (no Wayland/Hyprland) | `decision_log.md` DL-004R | Accepted (bounds what Volume III can implement in v1) |
 
 ---
 
@@ -174,7 +174,7 @@ This document makes no new architectural decisions. The following are **inherite
 Intentionally minimal. Living Interface is a design contract, not an implementation. Concrete technical decisions belong to Volume III documents once they exist:
 
 - **Luna Graphics Protocol (LGP):** TODO — not yet specified. Should be written to expose the Color Semantic Contract, Motion Vocabulary, and Animation Budget as protocol-level primitives rather than per-application conventions.
-- **Compositor:** Per DL-004, Hyprland is the v1 compositor. Hyprland's existing animation system is hardware-accelerated and configurable (per DL-004 reasoning), but no decision has been made on how Living Interface's locked tables map onto Hyprland's animation config syntax. TODO.
+- **Compositor:** Per DL-004R, the LGP compositor is used from v1. The animation system will be a custom component. No decision has been made on how Living Interface's locked tables map onto the LGP animation config syntax. TODO.
 - **Rendering Pipeline / Animation Engine / Theme Engine:** TODO — no decisions exist yet. Decision not yet finalized.
 - **Frame budget / refresh-rate assumptions:** TODO — not addressed in any canonical document.
 - **GPU / hardware minimum requirements for Living Interface motion:** TODO.
@@ -183,7 +183,7 @@ Intentionally minimal. Living Interface is a design contract, not an implementat
 
 ## Future Improvements
 
-- When the v2 custom wlroots compositor is built (per DL-004), Living Interface primitives should be native to the compositor rather than expressed through Hyprland configuration. TODO at that milestone.
+- The LGP compositor (per DL-004R) ensures that Living Interface primitives are native to the compositor rather than expressed through configuration files.
 - Volume III's Theme Engine document should define how third-party or user-created themes are constrained by the locked Color Semantic Contract (i.e., can a user retheme LUNA Pink to a different hex value, or is the *meaning* locked but the *exact hex* themeable?). Decision not yet finalized.
 - Audio is not currently part of Living Interface. If DL-P02 (Sound design, `decision_log.md` Pending Decisions) is accepted, this document will need a revision to define an audio-equivalent of the Motion Vocabulary.
 
@@ -222,4 +222,4 @@ Before implementing any animated, colored, or state-expressing UI element on Lun
 *Document: `00_Foundation/living_interface_design.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
 *Version: 0.1-concept*
-*Cross-references: `philosophy.md` (Law III), `core_laws.md` (Law III, Amendments), `luna_personality.md` (Expression Layer), `identity.md` (Luna Island), `decision_log.md` (DL-004)*
+*Cross-references: `philosophy.md` (Law III), `core_laws.md` (Law III, Amendments), `luna_personality.md` (Expression Layer), `identity.md` (Luna Island), `decision_log.md` (DL-004R)*

@@ -72,7 +72,7 @@ LUNA is not a single process. LUNA is a **runtime** — a coordinated set of com
 `luna-ai-d` starts at luna-init Stage 6. It runs for the entire session. It shuts down gracefully at Session teardown (summarizes memory before exit).
 
 **Process characteristics:**
-- Language: C (v1), Rust migration (v2 — analogous to DL-007)
+- Language: TODO — Unconfirmed for v1 (C vs Python). Rust migration planned for v2 (analogous to DL-007). Needs DL entry.
 - Cgroup: `luna-ai.slice`
 - Runs as: the logged-in user (not root)
 - Persistent state: `~/.luna/memory/` and `~/.luna/config/`
@@ -354,17 +354,11 @@ TODO:
 Decision not yet finalized.
 ```
 
-1. **LUNA Island click behavior.** What happens when the user clicks Luna Island? Does it open a conversation panel? A mini-dashboard? Nothing (passive presence)? Must be a Decision Log entry.
+1. **Live2D integration.** v1 luna-island uses static LGP surface transforms. Live2D would replace the rendering model entirely. Must be evaluated as a v1.5 project. License review required.
 
-2. **Conversation panel ownership.** If LUNA conversation opens a full UI panel, which process owns that surface? luna-island (expands the island) or a separate `luna-chat` process? Must be a Decision Log entry.
+2. **Mode detection thresholds.** The timeouts in the mode state machine (idle > 10 min → AMBIENT, single app focused > 5 min → FOCUS) are estimates. Must be validated against real user workflows.
 
-3. **Live2D integration.** v1 luna-island uses static LGP surface transforms. Live2D would replace the rendering model entirely. Must be evaluated as a v1.5 project. License review required.
-
-4. **LUNA voice.** `luna_personality.md` lists spoken dialogue as Priority 7 (highest escalation). No TTS system has been specified. Is voice in-scope for v1? Must be a Decision Log entry.
-
-5. **Mode detection thresholds.** The timeouts in the mode state machine (idle > 10 min → AMBIENT, single app focused > 5 min → FOCUS) are estimates. Must be validated against real user workflows.
-
-6. **Multi-user sessions.** Does each user get their own `luna-ai-d` instance? Presumably yes — each user has their own `~/.luna/`. Must be confirmed.
+3. **Multi-user sessions.** Does each user get their own `luna-ai-d` instance? Presumably yes — each user has their own `~/.luna/`. Must be confirmed.
 
 ---
 

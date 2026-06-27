@@ -120,31 +120,11 @@ This allows the compositor to run on hardware without Vulkan support by falling 
 
 ### GPU Backend
 
-```
-TODO:
-Decision not yet finalized.
-Reason: GPU backend selection requires a Decision Log entry.
-Current direction: Vulkan as the primary backend, OpenGL/EGL as fallback.
+Per **DL-026**, the GPU backend is implemented in two stages:
+- **Stage 2:** Software renderer (CPU blit to dumb framebuffer). Proves the compositor pipeline, LGP protocol, and rendering architecture before GPU complexity is introduced.
+- **Stage 3:** Vulkan as the primary GPU renderer. OpenGL/EGL as a fallback for hardware without Vulkan 1.1+ support.
 
-Vulkan backend considerations:
-  - Requires Vulkan 1.1+ driver support
-  - Zero-copy DMA-BUF import via VK_EXT_external_memory_dma_buf
-  - Explicit synchronization via VK_KHR_external_fence_fd / VK_KHR_timeline_semaphore
-  - More complex initialization (~500 lines vs ~50 lines for EGL)
-  - Better long-term performance ceiling
-  - Required for GPU-accelerated CANVAS_SURFACE compositing
-
-OpenGL/EGL fallback considerations:
-  - Supported on virtually all Linux GPU drivers
-  - EGL provides DRM/KMS integration via EGL_KHR_platform_gbm
-  - GBM (Generic Buffer Management) for framebuffer allocation
-  - Simpler to implement for a prototype
-  - Higher API overhead per draw call
-
-Both backends will produce the same visual output. The abstraction layer
-ensures compositor correctness is independent of backend selection.
-This must be the second Volume III Decision Log entry (after LGP wire format).
-```
+Vulkan backend provides zero-copy DMA-BUF import and explicit synchronization, necessary for GPU-accelerated CANVAS_SURFACE compositing. OpenGL/EGL provides a fallback path with mature driver support. Both backends will produce the same visual output. The abstraction layer ensures compositor correctness is independent of backend selection.
 
 ### DRM/KMS Interface
 
@@ -316,20 +296,7 @@ v1 target: ARGB8888. HDR support is post-v1.
 
 At Stage 5 of boot, the framebuffer boot splash (rendered by `luna-init`) must transition to the compositor:
 
-```
-TODO:
-Decision not yet finalized.
-Reason: The handoff technique between the framebuffer boot splash and the
-LGP compositor is undecided. Three options (from 02_boot_flow.md):
-  A: Compositor claims framebuffer device directly; luna-init detects and stops.
-  B: Accept a brief visual transition (single-frame cut).
-  C: Compositor renders the boot splash from the start (luna-init delegates
-     to compositor for the splash; compositor starts before Stage 5 complete).
-Option C is architecturally cleanest but requires the compositor to be started
-before the full Stage 4 system services are up. May not be feasible.
-Option B is simplest and adds ~16ms of black screen on transition.
-This decision must be made before Stage 5 implementation begins.
-```
+Per **DL-043**, LunaOS accepts a brief visual transition (single black frame, ~16ms at 60Hz) between the luna-init framebuffer boot splash and the LGP compositor's first frame. No architectural complexity is introduced to eliminate this cut. The boot splash renderer (luna-init) stops rendering before the compositor takes over, and the lgp-compositor's first frame is its own rendered output.
 
 ---
 
@@ -360,22 +327,13 @@ This decision must be made before Stage 5 implementation begins.
 
 ## Open Questions
 
-```
-TODO:
-Decision not yet finalized.
-```
+1. **Framebuffer format.** ARGB8888 for v1. HDR format for v2. Must be documented in a DL entry.
 
-1. **GPU backend.** Vulkan primary + OpenGL/EGL fallback. Must be a Decision Log entry.
+2. **Adaptive sync (VRR).** Not a v1 priority. Decision Log entry when v1.5 work begins.
 
-2. **Framebuffer format.** ARGB8888 for v1. HDR format for v2. Must be documented in a DL entry.
+3. **Multi-GPU.** Single GPU for v1. Decision Log entry when multi-GPU work begins.
 
-3. **Boot splash handoff.** Options A/B/C above. Must be decided before Stage 5 implementation.
-
-4. **Adaptive sync (VRR).** Not a v1 priority. Decision Log entry when v1.5 work begins.
-
-5. **Multi-GPU.** Single GPU for v1. Decision Log entry when multi-GPU work begins.
-
-6. **GPU memory limit.** The 256 MB compositor GPU memory target is an estimate. Depends on number of simultaneous surfaces and resolution. Must be validated on reference hardware.
+4. **GPU memory limit.** The 256 MB compositor GPU memory target is an estimate. Depends on number of simultaneous surfaces and resolution. Must be validated on reference hardware.
 
 ---
 

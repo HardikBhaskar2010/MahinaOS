@@ -54,7 +54,7 @@ Reuse identical wording everywhere thereafter
 
 | Term | Definition | Source |
 |---|---|---|
-| **Luna Island** | LUNA's physical UI presence; a Wayland layer-shell surface, distinct from luna-bar and luna-notif. | `identity.md`, `luna_personality.md` |
+| **Luna Island** | LUNA's physical UI presence; an LGP LUNA_ISLAND surface, distinct from luna-bar and luna-notif. | `identity.md`, `luna_personality.md` |
 | **LUNA.AI / luna-ai-d** | The AI daemon. Listens on `localhost:7734`, internal only. | `decision_log.md` DL-010, `philosophy.md` |
 | **Personality Modes** | The six defined LUNA behavior states: DEVSHELL, FOCUS, MEDIA, AMBIENT, CONVERSATION, CRISIS. | `luna_personality.md` |
 | **Expression Layer** | The seven-priority hierarchy (gaze → color → animation → island state → prop → text → voice) governing how LUNA communicates. | `luna_personality.md` |
