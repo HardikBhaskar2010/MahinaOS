@@ -219,7 +219,7 @@ run-qemu-headless: image
 # Unit tests (with mandatory sanitizers — Volume VI / 05_testing_standards.md)
 # ---------------------------------------------------------------------------
 
-test-unit: $(UNITY_OBJ) | $(BUILD_DIR)/tests
+test-unit: $(UNITY_OBJ) $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(LUNA_INIT_OBJECTS:.o=_test_asan.o)) | $(BUILD_DIR)/tests
 	@echo "  TEST    Running unit tests with ASan + UBSan"
 	@failed=0; \
 	for src in $(TEST_SOURCES); do \
@@ -228,7 +228,7 @@ test-unit: $(UNITY_OBJ) | $(BUILD_DIR)/tests
 	    $(CC) $(CFLAGS_TEST) $(INCLUDES) \
 	        -I$(TESTS_DIR)/vendor/unity \
 	        $$src \
-	        $(filter-out $(BUILD_DIR)/luna-init/main.o, $(LUNA_INIT_OBJECTS:.o=_test_asan.o)) \
+	        $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(LUNA_INIT_OBJECTS:.o=_test_asan.o)) \
 	        $(UNITY_OBJ) \
 	        -o $(BUILD_DIR)/tests/$$name 2>&1 || { failed=1; continue; }; \
 	    echo "  RUN     $$name"; \

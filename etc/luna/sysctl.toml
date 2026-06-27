@@ -1,0 +1,24 @@
+# /etc/luna/sysctl.toml — Kernel Parameter Overrides
+# Authority: Volume II / 02_boot_flow.md §Stage 3
+
+[kernel]
+# Disable magic SysRq except for sync+remount+reboot (security — 08_security.md)
+"kernel.sysrq" = 176
+
+# Restrict dmesg to root (security hardening)
+"kernel.dmesg_restrict" = 1
+
+# Restrict kernel pointer leaks in /proc
+"kernel.kptr_restrict" = 2
+
+[vm]
+# Swappiness — prefer not to swap for desktop performance
+"vm.swappiness" = 10
+
+# Dirty page writeback — reduce I/O latency
+"vm.dirty_ratio"            = 10
+"vm.dirty_background_ratio" = 5
+
+[net]
+# Enable IPv4 forwarding (needed for future container/sandbox support, DL-020)
+"net.ipv4.ip_forward" = 0

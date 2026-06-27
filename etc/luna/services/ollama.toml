@@ -1,0 +1,31 @@
+# /etc/luna/services/ollama.toml
+# Authority: DL-021 (AI Runtime Architecture)
+# NOTE: Ollama is NOT started at boot (lazy loaded by luna-ai-d)
+# This file is used for manual starts or when the inference engine triggers it.
+
+[service]
+name        = "ollama"
+binary      = "/usr/bin/ollama"
+description = "Ollama Local AI Inference Engine"
+args        = ["serve"]
+
+[service.depends]
+after  = ["networkmanager"]
+
+[service.ready]
+method     = "http"
+path       = "http://localhost:11434/"
+timeout_ms = 10000
+
+[service.restart]
+policy   = "on-failure"
+attempts = 2
+delay_ms = 2000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 15000   # Needs time to flush models from VRAM
+
+[service.identity]
+user  = "ollama"
+group = "ollama"

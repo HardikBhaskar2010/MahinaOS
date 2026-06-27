@@ -1,0 +1,30 @@
+# /etc/luna/services/pipewire.toml
+# Authority: Volume II / 04_init_system.md
+# Authority: Volume II / 02_boot_flow.md §Stage 4
+
+[service]
+name        = "pipewire"
+binary      = "/usr/bin/pipewire"
+description = "PipeWire multimedia server"
+args        = []
+
+[service.depends]
+after  = ["dbus"]
+
+[service.ready]
+method     = "socket"
+path       = "/run/pipewire/pipewire-0"
+timeout_ms = 3000
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 1000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 2000
+
+[service.identity]
+user  = "pipewire"
+group = "pipewire"

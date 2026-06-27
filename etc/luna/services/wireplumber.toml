@@ -1,0 +1,28 @@
+# /etc/luna/services/wireplumber.toml
+# Authority: Volume II / 04_init_system.md
+
+[service]
+name        = "wireplumber"
+binary      = "/usr/bin/wireplumber"
+description = "PipeWire session and policy manager"
+args        = []
+
+[service.depends]
+after  = ["pipewire"]
+
+[service.ready]
+method     = "none"
+timeout_ms = 5000
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 1000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 2000
+
+[service.identity]
+user  = "pipewire"
+group = "pipewire"

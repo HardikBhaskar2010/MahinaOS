@@ -15,6 +15,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -228,16 +229,7 @@ void luna_log_switch_to_runtime(void) {
     }
 }
 
-void luna_log_open_runtime(const char *runtime_log_path) {
-    g_runtime_fd = open(runtime_log_path,
-                        O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC,
-                        0644);
-    if (g_runtime_fd < 0) {
-        dprintf(STDERR_FILENO,
-                "[luna-init] [ERROR] Failed to open runtime log '%s': %s\n",
-                runtime_log_path, strerror(errno));
-    }
-}
+
 
 uint64_t luna_log_boot_time_ms(void) {
     return log_get_boot_ms();

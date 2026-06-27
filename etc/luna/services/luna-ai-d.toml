@@ -1,0 +1,30 @@
+# /etc/luna/services/luna-ai-d.toml
+# Authority: DL-021 (AI Runtime Architecture)
+# This is the Presence Engine, started at boot (Stage 6).
+
+[service]
+name        = "luna-ai-d"
+binary      = "/usr/bin/luna-ai-d"
+description = "LUNA Presence Engine"
+args        = []
+
+[service.depends]
+after  = ["dbus"]
+
+[service.ready]
+method     = "socket"
+path       = "/run/luna-ai.sock"
+timeout_ms = 5000
+
+[service.restart]
+policy   = "always"
+attempts = 5
+delay_ms = 1000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 3000
+
+[service.identity]
+user  = "luna"
+group = "luna"

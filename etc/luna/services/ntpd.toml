@@ -1,0 +1,28 @@
+# /etc/luna/services/ntpd.toml
+# Authority: DL-015 (Time Synchronization)
+
+[service]
+name        = "ntpd"
+binary      = "/usr/sbin/ntpd"
+description = "NTP daemon"
+args        = ["-d", "-n"]
+
+[service.depends]
+after  = ["networkmanager"]
+
+[service.ready]
+method     = "none"
+timeout_ms = 5000
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 5000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 2000
+
+[service.identity]
+user  = "ntp"
+group = "ntp"

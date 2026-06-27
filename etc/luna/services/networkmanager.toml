@@ -1,0 +1,30 @@
+# /etc/luna/services/networkmanager.toml
+# Authority: Volume II / 04_init_system.md §Service File Format
+# Authority: Volume II / 02_boot_flow.md §Stage 4
+# Authority: DL-013 (wireless backend) — NetworkManager selected
+
+[service]
+name        = "networkmanager"
+binary      = "/usr/sbin/NetworkManager"
+description = "NetworkManager — network connection manager"
+args        = ["--no-daemon", "--log-level=WARN"]
+
+[service.depends]
+after  = ["dbus"]   # D-Bus must be running before NetworkManager starts
+
+[service.ready]
+method     = "none"   # NetworkManager does not expose a ready socket by default
+timeout_ms = 8000
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 2000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 5000
+
+[service.identity]
+user  = "root"
+group = "root"

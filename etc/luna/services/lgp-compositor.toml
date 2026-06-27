@@ -1,0 +1,29 @@
+# /etc/luna/services/lgp-compositor.toml
+# Authority: Volume II / 01_architecture_overview.md §Stage 5
+
+[service]
+name        = "lgp-compositor"
+binary      = "/usr/bin/lgp-compositor"
+description = "Luna Graphics Protocol Compositor"
+args        = []
+
+[service.depends]
+after  = ["dbus"]
+
+[service.ready]
+method     = "socket"
+path       = "/run/lgp/compositor.sock"
+timeout_ms = 5000
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 1000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 3000
+
+[service.identity]
+user  = "root"
+group = "root"

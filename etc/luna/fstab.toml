@@ -1,0 +1,50 @@
+# /etc/luna/fstab.toml — Mahina Filesystem Table
+# Authority: Volume II / 02_boot_flow.md §Stage 2
+# Authority: Volume II / 09_filesystem.md §tmpfs Configuration
+#
+# Format: [[mount]] array-of-tables per TOML spec (DL-008)
+# Mounts are applied in declaration order.
+# Critical filesystems: proc, sysfs, devtmpfs — failure is fatal.
+# All other filesystems: failure is logged WARN, boot continues.
+
+[[mount]]
+device     = "proc"
+mountpoint = "/proc"
+fstype     = "proc"
+options    = ["nodev", "nosuid", "noexec"]
+
+[[mount]]
+device     = "sysfs"
+mountpoint = "/sys"
+fstype     = "sysfs"
+options    = ["nodev", "nosuid", "noexec"]
+
+[[mount]]
+device     = "devtmpfs"
+mountpoint = "/dev"
+fstype     = "devtmpfs"
+options    = ["nosuid", "noexec"]
+
+[[mount]]
+device     = "devpts"
+mountpoint = "/dev/pts"
+fstype     = "devpts"
+options    = ["nosuid", "noexec", "gid=5", "mode=0620"]
+
+[[mount]]
+device     = "tmpfs"
+mountpoint = "/tmp"
+fstype     = "tmpfs"
+options    = ["nosuid", "nodev", "noexec", "size=2G", "mode=1777"]
+
+[[mount]]
+device     = "tmpfs"
+mountpoint = "/run"
+fstype     = "tmpfs"
+options    = ["nosuid", "nodev", "noexec", "size=256M", "mode=0755"]
+
+[[mount]]
+device     = "tmpfs"
+mountpoint = "/dev/shm"
+fstype     = "tmpfs"
+options    = ["nosuid", "nodev", "noexec", "size=512M"]

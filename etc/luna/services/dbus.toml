@@ -1,0 +1,31 @@
+# /etc/luna/services/dbus.toml
+# Authority: Volume II / 04_init_system.md §Service File Format
+# Authority: Volume II / 02_boot_flow.md §Stage 4
+
+[service]
+name        = "dbus"
+binary      = "/usr/bin/dbus-daemon"
+description = "D-Bus system message bus"
+args        = ["--system", "--nofork", "--nopidfile", "--syslog-only"]
+
+[service.depends]
+after  = []   # No dependencies — first Stage 4 service
+before = ["networkmanager", "pipewire", "luna-ai-d"]
+
+[service.ready]
+method     = "socket"
+path       = "/run/dbus/system_bus_socket"
+timeout_ms = 5000
+
+[service.restart]
+policy   = "always"
+attempts = 5
+delay_ms = 1000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 3000
+
+[service.identity]
+user  = "messagebus"
+group = "messagebus"

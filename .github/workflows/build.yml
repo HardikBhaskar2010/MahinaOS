@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang make mtools dosfstools libbtrfs-dev
+
+    - name: Build luna-init
+      run: make
+
+    - name: Run unit tests
+      run: |
+        # Optional: Add test target in Makefile in the future
+        # make test
+        echo "Tests placeholder"

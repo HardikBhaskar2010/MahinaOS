@@ -1,0 +1,19 @@
+# Build artifacts
+build/
+*.img
+*.iso
+*.o
+*.bin
+*.elf
+
+# Kernel downloads and extraction
+kernel/linux-*/
+kernel/*.tar.xz
+kernel/*.tar.gz
+
+# IDE / OS / Agent files
+.gemini/
+.vscode/
+.DS_Store
+*~
+*.swp
