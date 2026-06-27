@@ -1,0 +1,115 @@
+# Mahina CI Pipeline
+# Authority: Volume VI / 05_testing_standards.md §CI Pipeline Test Gates
+# Gates: 1 (Build) → 2 (Unit Tests) → 3 (Static Analysis) → 4 (Fuzz Regression)
+# Platform: Ubuntu 24.04 (closest to WSL2 build environment)
+
+name: Mahina Stage 0 CI
+
+on:
+  push:
+    branches: [ "main", "stage-0" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gate 1: Build — must compile without warnings (-Wall -Wextra -Werror)
+  # Authority: Volume VI / 05_testing_standards.md §Gate 1
+  # ─────────────────────────────────────────────────────────────────────────
+  build:
+    name: "Gate 1 — Build (clang, -Werror)"
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang lld llvm make
+
+      - name: Build luna-init (static)
+        run: make luna-init CC=clang
+
+      - name: Build luna-init-ctl
+        run: make luna-init-ctl CC=clang
+
+      - name: Check binary size (luna-init must fit in initramfs)
+        run: |
+          SIZE=$(stat -c%s build/luna-init/luna-init)
+          echo "luna-init size: ${SIZE} bytes"
+          # Hard limit: 4 MB. luna-init should be well under this.
+          if [ "$SIZE" -gt $((4 * 1024 * 1024)) ]; then
+            echo "ERROR: luna-init exceeds 4 MB size limit"
+            exit 1
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahina-binaries
+          path: build/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gate 2: Unit Tests — must pass 100% with ASan + UBSan
+  # Authority: Volume VI / 05_testing_standards.md §Gate 2
+  # ─────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: "Gate 2 — Unit Tests (ASan + UBSan)"
+    runs-on: ubuntu-24.04
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang lld llvm make
+
+      - name: Run unit tests
+        run: make test-unit CC=clang
+        env:
+          ASAN_OPTIONS: "halt_on_error=1:detect_leaks=1"
+          UBSAN_OPTIONS: "halt_on_error=1:print_stacktrace=1"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gate 3: Static Analysis — clang-tidy, zero warnings
+  # Authority: Volume VI / 05_testing_standards.md §Gate 3
+  # ─────────────────────────────────────────────────────────────────────────
+  lint:
+    name: "Gate 3 — Static Analysis (clang-tidy)"
+    runs-on: ubuntu-24.04
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang clang-tidy
+
+      - name: Run clang-tidy
+        run: make lint CC=clang
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gate 4: Fuzz Regression — known crash corpus must not crash
+  # Authority: Volume VI / 05_testing_standards.md §Gate 4
+  # ─────────────────────────────────────────────────────────────────────────
+  fuzz-regression:
+    name: "Gate 4 — Fuzz Regression (TOML parser)"
+    runs-on: ubuntu-24.04
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang lld llvm make
+
+      - name: Run fuzz regression
+        run: make test-fuzz CC=clang

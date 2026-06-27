@@ -1,0 +1,322 @@
+# Mahina Linux Kernel Configuration Notes
+# Authority: Volume II / 03_linux_architecture.md, DL-009 (Linux 6.6.x LTS)
+# Architecture: x86_64 only (v1). ARM64 is post-v1.
+# Build target: QEMU + x86_64 UEFI bare metal
+#
+# Every CONFIG_ option enabled below has a written justification here.
+# Disabling an option without updating this file violates Core Law I (Own Every Layer).
+#
+# Usage:
+#   cp kernel/.config linux-6.6.x/.config
+#   cd linux-6.6.x && make olddefconfig
+#   make -j$(nproc) bzImage
+
+# =============================================================================
+# CORE PLATFORM
+# =============================================================================
+
+CONFIG_X86_64=y
+# Reason: x86_64 is the only v1 target architecture (DL-009, architecture_overview.md)
+
+CONFIG_64BIT=y
+# Reason: Required by x86_64
+
+CONFIG_SMP=y
+# Reason: Multi-core support required for reference hardware (2+ core minimum)
+
+CONFIG_NR_CPUS=256
+# Reason: Reasonable upper bound; does not affect single-core performance
+
+CONFIG_HZ=250
+# Reason: 250Hz tick is a good balance between latency and CPU overhead for desktop use
+
+CONFIG_PREEMPT_VOLUNTARY=y
+# Reason: Voluntary preemption provides good desktop latency without full-RT overhead
+# PREEMPT_NONE is too coarse for desktop. PREEMPT_RT is not needed for v1.
+
+CONFIG_NO_HZ_IDLE=y
+# Reason: Tickless idle reduces power consumption on battery-powered hardware
+
+# =============================================================================
+# UEFI / EFI BOOT
+# =============================================================================
+
+CONFIG_EFI=y
+CONFIG_EFI_STUB=y
+# Reason: EFI stub allows the kernel to boot directly from UEFI without a separate
+# bootloader stage. limine (DL-005) handles this, but EFI_STUB is required by limine
+# to load the kernel as an EFI application.
+
+CONFIG_EFI_VARS=y
+# Reason: Required to read/write UEFI runtime variables (boot order, etc.)
+
+CONFIG_FB_EFI=y
+# Reason: EFI framebuffer for early console output before DRM/KMS is initialized.
+# Provides the "black screen with kernel messages" visible during boot.
+
+# =============================================================================
+# FILESYSTEMS
+# =============================================================================
+
+CONFIG_BTRFS_FS=y
+# Reason: Btrfs is the Mahina root filesystem (DL-027). Subvolumes @, @home,
+# @snapshots are required by the installer. Snapshot support enables pre-update
+# rollback (Core Law V — user owns the machine).
+
+CONFIG_BTRFS_FS_POSIX_ACL=y
+# Reason: POSIX ACLs required for fine-grained permission control on system directories
+
+CONFIG_EXT4_FS=y
+# Reason: ext4 support for compatibility with existing Linux filesystems during
+# development/migration. Not the primary Mahina filesystem but needed for rescue tools.
+
+CONFIG_PROC_FS=y
+# Reason: /proc is mounted at Stage 2 (02_boot_flow.md). Required by luna-init,
+# ps, top, and every sane Linux userspace tool.
+
+CONFIG_SYSFS=y
+# Reason: /sys is mounted at Stage 2. Required for device enumeration, DRM/KMS,
+# libinput, NetworkManager, and PipeWire.
+
+CONFIG_TMPFS=y
+# Reason: /tmp and /run are mounted as tmpfs at Stage 2 (09_filesystem.md).
+# tmpfs is mandatory — /run holds luna-init.sock and other runtime state.
+
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# Reason: devtmpfs provides /dev device nodes. luna-init mounts devtmpfs at
+# Stage 2. DEVTMPFS_MOUNT auto-mounts it before luna-init runs, providing
+# /dev/console and basic device access during early boot.
+
+CONFIG_FAT_FS=y
+CONFIG_VFAT_FS=y
+# Reason: EFI System Partition is FAT32 (DL-012). VFAT required to read/write
+# the ESP for kernel and limine updates.
+
+CONFIG_FUSE_FS=y
+# Reason: FUSE support for user-space filesystem drivers. Required by some
+# third-party applications and development tools.
+
+# =============================================================================
+# VIRTIO (QEMU)
+# =============================================================================
+
+CONFIG_VIRTIO=y
+CONFIG_VIRTIO_PCI=y
+# Reason: virtio-pci is the QEMU virtio transport. Required for all virtio devices.
+
+CONFIG_VIRTIO_BLK=y
+# Reason: virtio-blk provides the /dev/vda disk device in QEMU. The Mahina QEMU
+# image uses virtio-blk as the primary storage device. Root is /dev/vda2.
+
+CONFIG_VIRTIO_NET=y
+# Reason: virtio-net provides the QEMU network interface. Required for
+# NetworkManager to manage the eth0 / ens3 interface in QEMU NAT mode.
+
+CONFIG_VIRTIO_CONSOLE=y
+# Reason: virtio-console provides a high-speed serial console for QEMU.
+# Used for automated testing via QEMU serial output (05_testing_standards.md §E2E).
+
+CONFIG_VIRTIO_INPUT=y
+# Reason: virtio-input provides keyboard and mouse input in QEMU.
+# Required for interactive testing before libinput/evdev are configured.
+
+CONFIG_DRM_VIRTIO_GPU=y
+# Reason: virtio-gpu provides a virtual GPU in QEMU. Required for DRM/KMS
+# in the QEMU environment. Enables Stage 5+ compositor testing in QEMU.
+
+CONFIG_VIRTIO_BALLOON=y
+# Reason: Memory balloon driver allows QEMU to reclaim guest memory.
+# Useful for memory-constrained development hosts.
+
+# =============================================================================
+# DRM / KMS (Graphics)
+# =============================================================================
+
+CONFIG_DRM=y
+# Reason: Direct Rendering Manager is the kernel graphics subsystem.
+# The LGP compositor (Volume III) uses DRM/KMS for framebuffer access
+# and page flipping. Required for Stage 5+.
+
+CONFIG_DRM_KMS_HELPER=y
+# Reason: KMS helper library used by all DRM drivers for modesetting.
+
+CONFIG_DRM_FBDEV_EMULATION=y
+# Reason: Provides /dev/fb0 framebuffer emulation on top of DRM.
+# Used by luna-splash (v0.5) for early boot animation before compositor starts.
+
+CONFIG_FB=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+# Reason: Framebuffer console provides text output on the framebuffer device.
+# Used for emergency shell and pre-compositor kernel messages.
+
+# =============================================================================
+# INPUT DEVICES
+# =============================================================================
+
+CONFIG_INPUT=y
+CONFIG_INPUT_EVDEV=y
+# Reason: evdev is the Linux input event interface. libinput (Stage 1+) reads
+# from /dev/input/event* via evdev. Required for keyboard and mouse in the compositor.
+
+CONFIG_HID=y
+CONFIG_USB_HID=y
+# Reason: USB HID driver for USB keyboards and mice on real hardware.
+# Required for hardware testing (5.1 — Hardware Compatibility Pass).
+
+CONFIG_INPUT_KEYBOARD=y
+CONFIG_INPUT_MOUSE=y
+# Reason: PS/2 keyboard and mouse support for legacy hardware compatibility.
+
+# =============================================================================
+# USB
+# =============================================================================
+
+CONFIG_USB=y
+CONFIG_USB_XHCI_HCD=y
+# Reason: xHCI is the USB 3.x host controller. Required for USB devices on
+# modern hardware. USB keyboards, mice, and storage devices use xHCI.
+
+CONFIG_USB_EHCI_HCD=y
+# Reason: EHCI is USB 2.0 host controller. Required for USB 2.0 compatibility.
+
+# =============================================================================
+# NETWORKING
+# =============================================================================
+
+CONFIG_NET=y
+CONFIG_INET=y
+# Reason: IPv4 networking stack. Required for NetworkManager, NTP (DL-015),
+# Ollama REST API (localhost:11434), and luna-ai-d (localhost:7734, DL-010).
+
+CONFIG_IPV6=y
+# Reason: IPv6 support. Required for modern network compatibility.
+
+CONFIG_NETFILTER=y
+CONFIG_NF_TABLES=y
+# Reason: nftables netfilter framework. Required by the Mahina firewall
+# (nftables.conf applied at Stage 4, 02_boot_flow.md).
+
+CONFIG_UNIX=y
+# Reason: Unix domain sockets. Required by luna-init.sock (/run/luna-init.sock),
+# D-Bus socket (/run/dbus/system_bus_socket), PipeWire socket, and lgp compositor socket.
+
+CONFIG_PACKET=y
+# Reason: AF_PACKET socket support. Required by NetworkManager for raw packet operations.
+
+# =============================================================================
+# CGROUPS (Service isolation — Stage 1+)
+# =============================================================================
+
+CONFIG_CGROUPS=y
+CONFIG_CGROUP_V2=y
+# Reason: cgroup v2 is the Mahina resource management interface.
+# The service supervisor (04_init_system.md) assigns each service to a cgroup slice:
+#   luna-compositor.slice (weight 800)
+#   luna-shell.slice       (weight 400)
+#   luna-system.slice      (weight 300)
+#   luna-ai.slice          (weight 200)
+
+CONFIG_CGROUP_SCHED=y
+CONFIG_FAIR_GROUP_SCHED=y
+# Reason: CPU scheduling via cgroup v2 weight system
+
+CONFIG_MEMCG=y
+# Reason: Memory accounting per cgroup. Required for OOM score assignment
+# (Ollama highest OOM score per DL-021).
+
+CONFIG_BLK_CGROUP=y
+# Reason: Block I/O cgroup accounting.
+
+# =============================================================================
+# SECURITY
+# =============================================================================
+
+CONFIG_SECURITY=y
+CONFIG_SECURITY_APPARMOR=y
+CONFIG_DEFAULT_SECURITY_APPARMOR=y
+# Reason: AppArmor is the Mahina mandatory access control system (08_security.md).
+# All system daemons have AppArmor profiles in /etc/apparmor.d/.
+# ENFORCING mode in release builds (4.2 in roadmap).
+
+CONFIG_SECCOMP=y
+CONFIG_SECCOMP_FILTER=y
+# Reason: seccomp-BPF for system call filtering. Used by service sandboxing (DL-020).
+
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_SHA256=y
+CONFIG_CRYPTO_AES=y
+# Reason: SHA-256 for lpkg package verification (Ed25519 signing requires SHA-512 too).
+# AES for memory encryption at rest (DL-023, ~/.luna/memory/ encryption).
+
+# =============================================================================
+# KERNEL FEATURES (required by luna-init)
+# =============================================================================
+
+CONFIG_SIGNALFD=y
+# Reason: luna-init uses signalfd() for signal handling in its epoll event loop.
+# signalfd avoids signal handler race conditions (04_init_system.md).
+
+CONFIG_TIMERFD=y
+# Reason: timerfd used for service startup timeouts in the supervisor.
+
+CONFIG_EVENTFD=y
+# Reason: eventfd used for internal event notification between luna-init components.
+
+CONFIG_INOTIFY_USER=y
+# Reason: luna-init uses inotify to watch /etc/luna/services/ for service file
+# changes when SIGHUP is received (04_init_system.md).
+
+CONFIG_EPOLL=y
+# Reason: luna-init's event loop uses epoll() (04_init_system.md §Technical Details).
+
+CONFIG_POSIX_TIMERS=y
+# Reason: Required for POSIX timer APIs used throughout userspace.
+
+CONFIG_FUTEX=y
+# Reason: Fast userspace mutexes. Required by glibc pthreads (DL-007).
+
+# =============================================================================
+# DEBUGGING (disabled in release, enabled in dev builds)
+# =============================================================================
+
+# CONFIG_DEBUG_KERNEL is not set
+# Reason: Debug kernel options add significant overhead. Development uses
+# QEMU's -s -S flags for debugging instead. Kernel debug options are enabled
+# only when tracking a specific kernel-level bug.
+
+CONFIG_KALLSYMS=y
+# Reason: Symbol names in oops/panic output. Essential for debugging crashes
+# without requiring a full debug kernel.
+
+CONFIG_PRINTK=y
+# Reason: Kernel printk for early boot messages. Silenced by 'quiet' parameter
+# in normal boot, but available for debugging via 'console=ttyS0'.
+
+# =============================================================================
+# AUDIO (PipeWire — Stage 1+)
+# =============================================================================
+
+CONFIG_SOUND=y
+CONFIG_SND=y
+CONFIG_SND_HDA_INTEL=y
+# Reason: Intel HDA is the dominant audio subsystem on x86 hardware.
+# Required for audio on real hardware (Stage 1 PipeWire integration).
+
+CONFIG_SND_VIRTIO=y
+# Reason: virtio-sound for QEMU audio testing.
+
+# =============================================================================
+# POWER MANAGEMENT
+# =============================================================================
+
+CONFIG_PM=y
+CONFIG_ACPI=y
+# Reason: ACPI is required for power management, battery status reading
+# (/sys/class/power_supply/ — used by LUNA system awareness in v0.9),
+# and CPU frequency scaling.
+
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
+# Reason: schedutil governor ties CPU frequency to scheduler load.
+# Better for desktop workloads than ondemand.
