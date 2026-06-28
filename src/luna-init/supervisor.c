@@ -17,6 +17,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <grp.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -109,6 +111,31 @@ static pid_t spawn_service(service_t *svc) {
 
     if (pid == 0) {
         /* ── Child process ── */
+
+        /* Identity enforcement */
+        if (svc->run_group[0] != '\0') {
+            struct group *gr = getgrnam(svc->run_group);
+            if (!gr) {
+                LUNA_ERROR(COMP, "Service '%s': group '%s' not found", svc->name, svc->run_group);
+                _exit(127);
+            }
+            if (setgid(gr->gr_gid) != 0) {
+                LUNA_ERROR(COMP, "Service '%s': setgid() failed", svc->name);
+                _exit(127);
+            }
+        }
+
+        if (svc->run_user[0] != '\0') {
+            struct passwd *pw = getpwnam(svc->run_user);
+            if (!pw) {
+                LUNA_ERROR(COMP, "Service '%s': user '%s' not found", svc->name, svc->run_user);
+                _exit(127);
+            }
+            if (setuid(pw->pw_uid) != 0) {
+                LUNA_ERROR(COMP, "Service '%s': setuid() failed", svc->name);
+                _exit(127);
+            }
+        }
 
         /* Set working directory */
         if (svc->workdir[0] && chdir(svc->workdir) != 0) {

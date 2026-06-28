@@ -48,7 +48,7 @@ void splash_start(void) {
         execve("/sbin/luna-splash", (char * const *)argv, (char * const *)envp);
         
         /* If execve fails, we might not have it in /sbin. Try local path for dev. */
-        execve("./build/luna-splash", (char * const *)argv, (char * const *)envp);
+        execve("./build/luna-splash/luna-splash", (char * const *)argv, (char * const *)envp);
         
         exit(1);
     }
