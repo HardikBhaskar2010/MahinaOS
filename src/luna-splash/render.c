@@ -90,6 +90,26 @@ static inline void put_pixel(int x, int y, uint32_t color) {
     }
 }
 
+void render_fade_out(void) {
+    if (!fb_mem) return;
+    size_t pixel_count = (size_t)vinfo.yres_virtual * (size_t)(finfo.line_length / (vinfo.bits_per_pixel / 8));
+    if (vinfo.bits_per_pixel != 32) return; /* simple fade only for 32bpp */
+
+    for (int step = 0; step < 16; step++) {
+        for (size_t i = 0; i < pixel_count; i++) {
+            uint32_t c = fb_mem[i];
+            uint8_t r = (c >> 16) & 0xFF;
+            uint8_t g = (c >> 8) & 0xFF;
+            uint8_t b = c & 0xFF;
+            r = (r > 16) ? r - 16 : 0;
+            g = (g > 16) ? g - 16 : 0;
+            b = (b > 16) ? b - 16 : 0;
+            fb_mem[i] = (r << 16) | (g << 8) | b;
+        }
+        usleep(30000);
+    }
+}
+
 void render_clear(uint32_t color) {
     for (int y = 0; y < screen_h; y++) {
         for (int x = 0; x < screen_w; x++) {

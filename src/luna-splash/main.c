@@ -108,6 +108,8 @@ int main(int argc, char **argv) {
         }
     }
     
+    render_fade_out();
+
 cleanup:
     if (sigfd >= 0) close(sigfd);
     if (epfd >= 0) close(epfd);

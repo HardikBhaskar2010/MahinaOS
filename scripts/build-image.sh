@@ -62,7 +62,7 @@ sudo mount "$LOOP_ESP" "$MNT_ROOT/boot/efi"
 echo "  IMAGE   Installing files..."
 
 # Create directory structure
-sudo mkdir -p "$MNT_ROOT"/{usr/bin,usr/sbin,etc/luna/services,var/log,tmp,run,proc,sys,dev}
+sudo mkdir -p "$MNT_ROOT"/{usr/bin,usr/sbin,etc/luna/services,var/log/luna-init,tmp,run,proc,sys,dev}
 # /usr merge symlinks
 sudo ln -s usr/bin "$MNT_ROOT/bin"
 sudo ln -s usr/sbin "$MNT_ROOT/sbin"
@@ -72,6 +72,13 @@ sudo cp "${BUILD_DIR}/luna-init/luna-init" "$MNT_ROOT/usr/sbin/"
 sudo cp "${BUILD_DIR}/luna-init-ctl/luna-init-ctl" "$MNT_ROOT/usr/bin/"
 if [ -f "${BUILD_DIR}/luna-splash/luna-splash" ]; then
     sudo cp "${BUILD_DIR}/luna-splash/luna-splash" "$MNT_ROOT/usr/sbin/"
+fi
+
+if [ -f "${BUILD_DIR}/lgp-compositor/lgp-compositor" ]; then
+    sudo cp "${BUILD_DIR}/lgp-compositor/lgp-compositor" "$MNT_ROOT/usr/bin/"
+fi
+if [ -f "${BUILD_DIR}/lgp-compositor/lgp-test-client" ]; then
+    sudo cp "${BUILD_DIR}/lgp-compositor/lgp-test-client" "$MNT_ROOT/usr/bin/"
 fi
 
 # Fetch and install busybox for an emergency shell
@@ -85,6 +92,11 @@ sudo ln -s /usr/bin/busybox "$MNT_ROOT/usr/bin/sh"
 
 # Copy configs
 sudo cp -r etc/luna/* "$MNT_ROOT/etc/luna/"
+
+# Create basic system files
+echo "root:x:0:0:root:/root:/bin/sh" | sudo tee "$MNT_ROOT/etc/passwd" >/dev/null
+echo "root:x:0:" | sudo tee "$MNT_ROOT/etc/group" >/dev/null
+echo "video:x:44:" | sudo tee -a "$MNT_ROOT/etc/group" >/dev/null
 
 # Copy bootloader, kernel, initramfs
 sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/"

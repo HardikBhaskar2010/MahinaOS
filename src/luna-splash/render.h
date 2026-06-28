@@ -23,6 +23,7 @@ extern int screen_h;
 
 int render_init(void);
 void render_cleanup(void);
+void render_fade_out(void);
 void render_clear(uint32_t color);
 void render_text(int x, int y, const char *text, uint32_t color);
 void render_text_centered(int y, const char *text, uint32_t color);

@@ -74,7 +74,7 @@ sleep 1 # Give devtmpfs a moment to create the /dev/vda2 block device
 # Mount the real root filesystem (virtio-blk /dev/vda2 for QEMU)
 # In a real setup, this would parse root= from /proc/cmdline
 echo "[initramfs] Mounting real root: /dev/vda2"
-mount -t btrfs -o ro,subvol=@ /dev/vda2 /mnt/root || {
+mount -t btrfs -o rw,subvol=@ /dev/vda2 /mnt/root || {
     echo "[initramfs] FATAL: Failed to mount real root"
     echo "Dropping to emergency shell..."
     exec busybox setsid busybox cttyhack sh
