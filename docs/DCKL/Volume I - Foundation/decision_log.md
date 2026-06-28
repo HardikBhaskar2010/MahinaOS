@@ -330,9 +330,7 @@ Original commission vs. generative art vs. procedural generator?
 **Target:** Before v1 release
 
 ### [DL-P04] License
-MIT vs. GPL v3
-**Current leaning:** MIT — maximum adoption over control
-**Target:** Before first public commit
+*Superseded by DL-052*
 
 ### [DL-P05] Public release timing
 Phase 2 (booting to desktop) for early community vs. Phase 4 (polished) for big launch?
@@ -1438,6 +1436,33 @@ Phosphor Icons aligns precisely with Mahina's icon design rules: 2px stroke weig
 
 ---
 
+## [DL-052] Project License: MIT
+Date: 2026-06-28
+Status: ACCEPTED
+Decided by: Hardik Bhaskar
+
+### Question
+Which open-source license should govern the Mahina OS repository?
+
+### Options Considered
+- **GPLv3** — Ensures derived works remain open source, but limits commercial integration.
+- **MIT** — Permissive, maximizes adoption, allows proprietary derivatives.
+- **Apache 2.0** — Permissive with patent grants, slightly more complex.
+
+### Decision
+MIT License for source code and documentation.
+
+### Reasoning
+The goal of Mahina is to rethink OS architecture, not to restrict how people use it. The MIT License offers maximum freedom for contributors and downstream integrators. It aligns with the permissive licensing of our major dependencies like Limine (BSD-2-Clause) and LLVM (Apache 2.0).
+
+### Consequences
+- `LICENSE` file created at repo root.
+- `COPYRIGHT.md` established.
+- All `.c` and `.h` files updated with MIT copyright headers.
+- DL-P04 closed.
+
+---
+
 *Document: `00_Foundation/decision_log.md`*
 *Author: Hardik Bhaskar (Luna Kitsune)*
-*This document is append-only. Add new entries at the top of the numbered section.*
+*This document is append-only.*
