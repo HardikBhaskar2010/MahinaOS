@@ -91,8 +91,10 @@ int depgraph_topo_sort(int *out_order, int max_count) {
      */
 
     int queue[SERVICE_MAX_COUNT];
-    int q_head = 0, q_tail = 0;
+    int q_head = 0;
+    int q_tail = 0;
     int indegree[SERVICE_MAX_COUNT];
+    memset(indegree, 0, sizeof(indegree));
     int out_count = 0;
 
     /* Copy in-degree (Kahn's modifies it) */

@@ -370,25 +370,17 @@ The one exception is the **blocking supervisor** issue: the epoll architecture i
 ## Summary: Issues by Category
 
 ### Contradictions (code violates documentation)
-1. `supervisor.c`: Blocking event loop during service startup contradicts epoll-driven architecture philosophy
+*(None)*
 
 ### Gaps (documented, not implemented)
-2. `supervisor.c`: Identity enforcement (`setuid`/`setgid`) not implemented
-3. `supervisor.c`: Cgroup assignment not implemented
-4. `supervisor.c`: READY_HTTP stubbed (returns true)
-5. `supervisor.c`: READY_SIGNAL stubbed (returns true)
-6. `main.c`: `luna_log_switch_to_runtime()` never called
-7. `main.c`: inotify watch not implemented (SIGHUP reload works without it)
-8. `render.c:render_logo()`: Block character rendering loop is empty
+1. `supervisor.c`: READY_HTTP stubbed (returns true)
+2. `supervisor.c`: READY_SIGNAL stubbed (returns true)
+3. `main.c`: `luna_log_switch_to_runtime()` never called
 
 ### Missing Documentation
-9. luna-splash has no DCKL chapter
-10. IPC protocol between luna-init and luna-splash has no formal spec
+4. luna-splash has no DCKL chapter
+5. IPC protocol between luna-init and luna-splash has no formal spec
 
 ### Administrative
-11. `.github/workflows/build.yml` is stale — delete
-12. `tests/unit/test_toml.c` and `test_depgraph.c` are stale — delete
-13. `DL-P04` in decision_log.md should be closed as DL-052
-14. `kernel/.config.notes` references `CONFIG_CGROUP_V2` which doesn't exist in Linux 6.6 kconfig
-15. `splash.c` line 51: fallback path `./build/luna-splash` should be `./build/luna-splash/luna-splash`
-16. `DL-004` header doesn't say "SUPERSEDED" despite DL-004R superseding it
+6. `DL-P04` in decision_log.md should be closed as DL-052
+7. `DL-004` header doesn't say "SUPERSEDED" despite DL-004R superseding it

@@ -132,7 +132,7 @@ Python for v1. Rust rewrite planned for v2 if performance matters.
 
 ---
 
-## [DL-004] Compositor: Hyprland (v1) → wlroots custom (v2)
+## [DL-004] Compositor: Hyprland (v1) → wlroots custom (v2) (SUPERSEDED)
 
 **Date:** Project start
 **Status:** ACCEPTED

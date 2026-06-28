@@ -76,7 +76,8 @@ void splash_stop(void) {
     
     if (splash_pid > 0) {
         kill(splash_pid, SIGTERM);
-        /* We rely on the zombie reaper in main.c to waitpid() this later */
+        /* Wait synchronously so KD_TEXT is restored before we continue */
+        waitpid(splash_pid, NULL, 0);
         splash_pid = -1;
     }
 }

@@ -14,8 +14,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <sys/signalfd.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <linux/kd.h>
 
 #define MAX_EVENTS 4
 
@@ -34,6 +37,12 @@ static int setup_signals(void) {
 
 int main(int argc, char **argv) {
     int pipe_fd = -1;
+    int sigfd = -1;
+    int tty_fd = open("/dev/tty0", O_RDWR | O_CLOEXEC);
+    
+    if (tty_fd >= 0) {
+        ioctl(tty_fd, KDSETMODE, KD_GRAPHICS);
+    }
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--fd") == 0 && i + 1 < argc) {
@@ -54,7 +63,7 @@ int main(int argc, char **argv) {
     int epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0) goto cleanup;
     
-    int sigfd = setup_signals();
+    sigfd = setup_signals();
     if (sigfd < 0) goto cleanup;
     
     struct epoll_event ev = {0};
@@ -104,5 +113,9 @@ cleanup:
     if (epfd >= 0) close(epfd);
     ipc_cleanup();
     render_cleanup();
+    if (tty_fd >= 0) {
+        ioctl(tty_fd, KDSETMODE, KD_TEXT);
+        close(tty_fd);
+    }
     return 0;
 }

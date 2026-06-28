@@ -76,7 +76,9 @@ static void handle_list(int client_fd) {
 static void handle_status(int client_fd, const char *name) {
     if (!name || name[0] == '\0') {
         /* Overall system status */
-        int running = 0, degraded = 0, stopped = 0;
+        int running = 0;
+        int degraded = 0;
+        int stopped = 0;
         for (int i = 0; i < g_service_count; i++) {
             switch (g_services[i].state) {
                 case SERVICE_STATE_RUNNING:  running++;  break;

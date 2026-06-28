@@ -302,7 +302,7 @@ static toml_error_t parse_line(toml_doc_t *doc, parse_state_t *state,
 
 toml_doc_t *toml_load_buffer(const char *buf, size_t buf_len,
                               toml_error_t *out_error) {
-    if (!buf || buf_len == 0 || buf_len > TOML_MAX_DOC_BYTES) {
+    if (!buf || buf_len == 0 || buf_len > (size_t)TOML_MAX_DOC_BYTES) {
         if (out_error) *out_error = TOML_ERR_TOO_LARGE;
         return NULL;
     }

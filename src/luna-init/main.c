@@ -282,8 +282,7 @@ int main(void) {
             } else if (fd == inotify_fd) {
                 /* Service definitions changed */
                 char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
-                ssize_t len;
-                while ((len = read(inotify_fd, buf, sizeof(buf))) > 0) {}
+                while (read(inotify_fd, buf, sizeof(buf)) > 0) {}
                 LUNA_INFO("luna-init", "Service directory changed, reloading definitions");
                 service_load_all(SERVICES_DIR);
                 depgraph_build();
@@ -299,8 +298,16 @@ int main(void) {
         if (!boot_complete && supervisor_is_boot_complete()) {
             boot_complete = true;
             LUNA_INFO("luna-init", "Stage 0 (v0.1) boot complete. Stages 5-7 pending.");
+            
+            splash_update("Boot Complete!", 100);
+            usleep(1500000); /* 1.5 second delay to admire the splash screen */
             splash_stop();
+            
             luna_log_switch_to_runtime();
+            
+            /* Clear the fbcon text buffer to avoid mangled overlap with the banner */
+            (void)write(STDOUT_FILENO, "\033[2J\033[H", 7);
+            
             console_print_welcome();
             
             pid_t shell_pid = fork();

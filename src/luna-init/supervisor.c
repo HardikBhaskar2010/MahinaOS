@@ -37,11 +37,11 @@
 static long long now_ms(void) {
     struct timespec ts = {0};
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    return (long long)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
+    return (long long)ts.tv_sec * 1000LL + (long long)ts.tv_nsec / 1000000LL;
 }
 
 static void sleep_ms(int ms) {
-    struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
+    struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (long)(ms % 1000) * 1000000L };
     nanosleep(&ts, NULL);
 }
 
@@ -49,7 +49,7 @@ static void sleep_ms(int ms) {
 
 bool supervisor_check_ready(service_t *svc, long long start_ms) {
     long long elapsed = now_ms() - start_ms;
-    if (elapsed > svc->ready_timeout_ms) return false;
+    if (elapsed > (long long)svc->ready_timeout_ms) return false;
 
     switch (svc->ready_method) {
         case READY_NONE:

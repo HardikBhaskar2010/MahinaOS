@@ -116,11 +116,10 @@ static mount_result_t do_mount(const char *device, const char *mountpoint,
             LUNA_FATAL(COMP, "FATAL: Failed to mount %s (%s) at %s: %s",
                        device, fstype, mountpoint, strerror(err));
             return MOUNT_ERR_FATAL;
-        } else {
-            LUNA_WARN(COMP, "Failed to mount %s at %s: %s (continuing)",
-                      device, mountpoint, strerror(err));
-            return MOUNT_ERR_WARN;
         }
+        LUNA_WARN(COMP, "Failed to mount %s at %s: %s (continuing)",
+                  device, mountpoint, strerror(err));
+        return MOUNT_ERR_WARN;
     }
 
     LUNA_INFO(COMP, "Mounted: %s (%s) at %s", device, fstype, mountpoint);

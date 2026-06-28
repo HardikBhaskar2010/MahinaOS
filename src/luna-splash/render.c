@@ -69,15 +69,31 @@ void render_cleanup(void) {
 
 static inline void put_pixel(int x, int y, uint32_t color) {
     if (x < 0 || x >= screen_w || y < 0 || y >= screen_h) return;
-    int offset = (y * line_length / 4) + x;
-    fb_mem[offset] = color;
+    
+    if (vinfo.bits_per_pixel == 32) {
+        int offset = (y * line_length / 4) + x;
+        fb_mem[offset] = color;
+    } else if (vinfo.bits_per_pixel == 16) {
+        int offset = (y * line_length / 2) + x;
+        uint16_t *fb16 = (uint16_t *)fb_mem;
+        uint8_t r = (color >> 16) & 0xFF;
+        uint8_t g = (color >> 8) & 0xFF;
+        uint8_t b = color & 0xFF;
+        uint16_t color16 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+        fb16[offset] = color16;
+    } else if (vinfo.bits_per_pixel == 24) {
+        int offset = (y * line_length) + (x * 3);
+        uint8_t *fb8 = (uint8_t *)fb_mem;
+        fb8[offset] = color & 0xFF;
+        fb8[offset+1] = (color >> 8) & 0xFF;
+        fb8[offset+2] = (color >> 16) & 0xFF;
+    }
 }
 
 void render_clear(uint32_t color) {
     for (int y = 0; y < screen_h; y++) {
-        uint32_t *row = fb_mem + (y * line_length / 4);
         for (int x = 0; x < screen_w; x++) {
-            row[x] = color;
+            put_pixel(x, y, color);
         }
     }
 }

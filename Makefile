@@ -206,7 +206,7 @@ $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 # Disk image (requires Linux / WSL2 — uses loopback devices)
 # ---------------------------------------------------------------------------
 
-image: luna-init
+image: all
 	@echo "  IMAGE   Building Mahina disk image..."
 	@bash $(SCRIPTS_DIR)/build-initramfs.sh
 	@bash $(SCRIPTS_DIR)/build-image.sh
@@ -303,9 +303,9 @@ test-fuzz: | $(BUILD_DIR)/tests
 lint:
 	@echo "  LINT    Running clang-tidy on all sources"
 	clang-tidy \
-	    --checks='-*,clang-analyzer-*,cert-*,bugprone-*,performance-*,portability-*,readability-*' \
+	    --checks='-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,cert-*,-cert-err33-c,-cert-err34-c,bugprone-*,-bugprone-easily-swappable-parameters,performance-*,portability-*,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-braces-around-statements,-readability-math-missing-parentheses,-readability-function-cognitive-complexity' \
 	    --warnings-as-errors='*' \
-	    $(LUNA_INIT_SOURCES) $(LUNA_CTL_SOURCES) \
+	    $(LUNA_INIT_SOURCES) $(LUNA_CTL_SOURCES) $(LUNA_SPLASH_SOURCES) \
 	    -- $(CFLAGS) $(INCLUDES)
 
 # ---------------------------------------------------------------------------

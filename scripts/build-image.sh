@@ -70,6 +70,9 @@ sudo ln -s usr/sbin "$MNT_ROOT/sbin"
 # Copy luna-init and luna-init-ctl
 sudo cp "${BUILD_DIR}/luna-init/luna-init" "$MNT_ROOT/usr/sbin/"
 sudo cp "${BUILD_DIR}/luna-init-ctl/luna-init-ctl" "$MNT_ROOT/usr/bin/"
+if [ -f "${BUILD_DIR}/luna-splash/luna-splash" ]; then
+    sudo cp "${BUILD_DIR}/luna-splash/luna-splash" "$MNT_ROOT/usr/sbin/"
+fi
 
 # Fetch and install busybox for an emergency shell
 if [ ! -f "${BUILD_DIR}/busybox" ]; then
