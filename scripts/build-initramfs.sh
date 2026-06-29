@@ -15,7 +15,9 @@ INITRAMFS_DIR="/tmp/initramfs-mahina"
 OUT_IMG="${BUILD_DIR}/initramfs-mahina.img"
 
 echo "  INITRAMFS Creating directory structure..."
-rm -rf "${INITRAMFS_DIR}"
+if [ -e "${INITRAMFS_DIR}" ]; then
+    rm -rf "${INITRAMFS_DIR}" 2>/dev/null || sudo rm -rf "${INITRAMFS_DIR}"
+fi
 mkdir -p "${INITRAMFS_DIR}"/{bin,sbin,etc,proc,sys,dev,tmp,run,var/log,mnt/root}
 
 echo "  INITRAMFS Installing binaries..."
@@ -45,9 +47,13 @@ fi
 
 echo "  INITRAMFS Creating early /dev nodes..."
 # These are needed before devtmpfs is mounted
-mknod -m 600 "${INITRAMFS_DIR}/dev/console" c 5 1
-mknod -m 666 "${INITRAMFS_DIR}/dev/null" c 1 3
-mknod -m 666 "${INITRAMFS_DIR}/dev/zero" c 1 5
+MKNOD="mknod"
+if [ "$(id -u)" -ne 0 ]; then
+    MKNOD="sudo mknod"
+fi
+${MKNOD} -m 600 "${INITRAMFS_DIR}/dev/console" c 5 1
+${MKNOD} -m 666 "${INITRAMFS_DIR}/dev/null" c 1 3
+${MKNOD} -m 666 "${INITRAMFS_DIR}/dev/zero" c 1 5
 
 echo "  INITRAMFS Writing init script..."
 # The init script run by the kernel
