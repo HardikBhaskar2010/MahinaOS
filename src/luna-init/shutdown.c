@@ -45,10 +45,7 @@ void shutdown_run(shutdown_mode_t mode) {
     LUNA_INFO(COMP, "Shutdown initiated. Mode: %s",
               mode == SHUTDOWN_REBOOT ? "REBOOT" : "POWEROFF");
 
-    /* Step 1: Flush the log */
-    luna_log_close();
-
-    /* Step 2: Stop all services in reverse start order (reverse dep order).
+    /* Step 1: Stop all services in reverse start order (reverse dep order).
      * Simple approach: stop in reverse index order (services were started
      * in topological order so reversing gives a safe stop order). */
     for (int i = g_service_count - 1; i >= 0; i--) {
@@ -62,8 +59,17 @@ void shutdown_run(shutdown_mode_t mode) {
     /* Give processes a moment to clean up after SIGKILL */
     sleep_ms(200);
 
-    /* Step 3: Unmount filesystems in reverse order */
+    /* Step 2: Unmount filesystems in reverse order */
     mount_unmount_all();
+
+    /* Step 3: Flush and close the log file NOW — after all components that
+     * may still call LUNA_* log macros have finished running. Previously
+     * luna_log_close() was called first (Step 1), causing all shutdown-path
+     * log entries (service stop, unmount) to silently fall through to stderr
+     * only rather than reaching the persistent log file.
+     * (CODE_AUDIT_REPORT §12) */
+    LUNA_INFO(COMP, "Shutdown complete — closing log.");
+    luna_log_close();
 
     /* Step 4: Kernel reboot/poweroff */
     sync();

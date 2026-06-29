@@ -185,12 +185,16 @@ static toml_error_t parse_value(const char *raw, toml_value_t *val) {
     }
 
     /* Boolean */
-    if (strncmp(raw, "true", 4) == 0) {
+    if (strncmp(raw, "true", 4) == 0 &&
+        (raw[4] == '\0' || isspace((unsigned char)raw[4]) || raw[4] == '#')) {
+        /* Require proper token termination to avoid "trueish" being accepted.
+         * (CODE_AUDIT_REPORT §6.1) */
         val->type       = TOML_TYPE_BOOLEAN;
         val->v.boolean  = true;
         return TOML_OK;
     }
-    if (strncmp(raw, "false", 5) == 0) {
+    if (strncmp(raw, "false", 5) == 0 &&
+        (raw[5] == '\0' || isspace((unsigned char)raw[5]) || raw[5] == '#')) {
         val->type       = TOML_TYPE_BOOLEAN;
         val->v.boolean  = false;
         return TOML_OK;
@@ -201,6 +205,11 @@ static toml_error_t parse_value(const char *raw, toml_value_t *val) {
     errno     = 0;
     long long iv = strtoll(raw, &end, 10);
     if (end != raw && errno == 0) {
+        /* Reject trailing garbage e.g. "5000garbage" — the value string has
+         * already been trimmed of whitespace and inline comments by parse_line(),
+         * so *end must be '\0' for a valid integer literal.
+         * (CODE_AUDIT_REPORT §6.2) */
+        if (*end != '\0') return TOML_ERR_INVALID;
         val->type      = TOML_TYPE_INTEGER;
         val->v.integer = (int64_t)iv;
         return TOML_OK;
@@ -448,4 +457,18 @@ const char *toml_strerror(toml_error_t err) {
         case TOML_ERR_TOO_LARGE:   return "document exceeds size limit";
         default:                   return "unknown error";
     }
+}
+
+int toml_enumerate_section(const toml_doc_t *doc, const char *section,
+                            toml_enumerate_cb_t callback, void *userdata) {
+    if (!doc || !section || !callback) return 0;
+    int count = 0;
+    for (size_t i = 0; i < doc->entry_count; i++) {
+        const toml_entry_t *e = &doc->entries[i];
+        if (e->array_table_index >= 0) continue; /* skip [[array]] entries */
+        if (strncmp(e->section, section, TOML_MAX_SECTION_LEN) != 0) continue;
+        callback(e->key, &e->value, userdata);
+        count++;
+    }
+    return count;
 }

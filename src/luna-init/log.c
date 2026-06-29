@@ -37,6 +37,9 @@
 static int g_boot_fd    = -1;
 static int g_runtime_fd = -1;
 
+/* Runtime log path stored at init time, opened at luna_log_switch_to_runtime(). */
+static char g_runtime_log_path[256] = {0};
+
 /* true after luna_log_switch_to_runtime() */
 static bool g_runtime_mode = false;
 
@@ -177,9 +180,13 @@ int luna_log_init(const char *boot_log_path, const char *runtime_log_path) {
         /* Not fatal — continue with stderr logging */
     }
 
-    /* Store runtime log path for later use in luna_log_switch_to_runtime() */
-    /* We do not open the runtime log yet — it is opened after Stage 7. */
-    (void)runtime_log_path; /* stored externally by caller if needed */
+    /* Store runtime log path for later use in luna_log_switch_to_runtime(). */
+    /* The file is not opened yet — only opened after the boot log is closed   */
+    /* (Stage 5 graphics transition per Volume II / 11_logging.md).            */
+    if (runtime_log_path) {
+        strncpy(g_runtime_log_path, runtime_log_path,
+                sizeof(g_runtime_log_path) - 1);
+    }
 
     return 0;
 }
@@ -224,8 +231,6 @@ void luna_log_set_level(luna_log_level_t min_level) {
 }
 
 void luna_log_switch_to_runtime(void) {
-    /* Runtime log path is passed at switch time */
-    /* This is called by main.c which holds the path strings */
     g_runtime_mode = true;
     g_min_level    = LOG_WARN; /* runtime default: WARN per Volume II/11 */
 
@@ -233,6 +238,22 @@ void luna_log_switch_to_runtime(void) {
         (void)fsync(g_boot_fd);
         (void)close(g_boot_fd);
         g_boot_fd = -1;
+    }
+
+    /* Open the runtime log file now that boot logging is done.
+     * This was the critical bug identified in CODE_AUDIT_REPORT §2:
+     * g_runtime_fd was declared but never assigned, causing all post-boot
+     * log entries to silently fall through to STDERR_FILENO. */
+    if (g_runtime_log_path[0] != '\0') {
+        g_runtime_fd = open(g_runtime_log_path,
+                            O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC,
+                            0644);
+        if (g_runtime_fd < 0) {
+            /* Cannot log this to the just-closed boot log; use stderr. */
+            dprintf(STDERR_FILENO,
+                    "[luna-init] [ERROR] Failed to open runtime log '%s': %s\n",
+                    g_runtime_log_path, strerror(errno));
+        }
     }
 }
 

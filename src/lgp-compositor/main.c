@@ -194,7 +194,12 @@ int main(int argc, char **argv) {
                             lgp_client_t *client = lgp_client_create(fd);
                             if (client) {
                                 lgp_hello_handle(client, &msg);
-                                /* Destroy the client object, but we keep the fd alive for this mock M3 */
+                                /* Set fd to -1 before destroying the struct so
+                                 * lgp_client_destroy() does not close the fd —
+                                 * the fd is managed by epoll and must stay open
+                                 * for the duration of the client connection.
+                                 * (CODE_AUDIT_REPORT §1.2) */
+                                client->fd = -1;
                                 lgp_client_destroy(client);
                             }
                         } else if (msg.type == LGP_MSG_FILL_RECT) {

@@ -29,6 +29,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -247,12 +248,22 @@ int ctl_server_init(void) {
 }
 
 void ctl_server_accept(int server_fd) {
-    int client = accept4(server_fd, NULL, NULL, SOCK_CLOEXEC);
+    /* SOCK_NONBLOCK: accepted fds do not inherit non-blocking from the listener.
+     * Without this flag, a client that connects but never writes would block
+     * the read() below forever, freezing the entire PID-1 event loop.
+     * (CODE_AUDIT_REPORT §9) */
+    int client = accept4(server_fd, NULL, NULL, SOCK_CLOEXEC | SOCK_NONBLOCK);
     if (client < 0) {
         if (errno != EAGAIN && errno != EWOULDBLOCK)
             LUNA_ERROR(COMP, "accept() failed: %s", strerror(errno));
         return;
     }
+
+    /* 1-second read timeout as a belt-and-suspenders guard even with
+     * SOCK_NONBLOCK (the nonblock flag makes a fully non-delivered read
+     * return EAGAIN; the timeout covers partial deliveries). */
+    struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     char buf[BUF_SIZE];
     ssize_t n = read(client, buf, sizeof(buf) - 1);

@@ -159,7 +159,15 @@ document decides otherwise.
 
 ### Message Format
 
-Per **DL-025**, LGP uses **TLV (Type-Length-Value)** binary framing for all wire messages. Each message consists of a 1-byte type field, a 4-byte length field, and an N-byte payload. No external serialization framework is required. This provides append-compatible message evolution, excellent hex-dump debuggability, and a minimal parser footprint.
+Per **DL-053** (superseding DL-025), LGP uses **TLV (Type-Length-Value)** binary framing for all wire messages. Each message consists of:
+
+| Field  | Size    | Type       | Notes |
+|--------|---------|------------|-------|
+| `type` | 2 bytes | `uint16_t` | Message type identifier — 65,535 distinct types |
+| `length` | 4 bytes | `uint32_t` | Total message length including the 6-byte header |
+| `payload` | N bytes | — | Message body; `length - 6` bytes |
+
+The 2-byte type field was chosen over the originally planned 1-byte field (DL-025) because message type constants like `LGP_MSG_ERROR = 0xFFFF` require 16-bit addressing, and the LGP type namespace is expected to grow beyond 255 distinct values as graphics primitives, input events, and compositor control messages are added. No external serialization framework is required. This provides append-compatible message evolution, excellent hex-dump debuggability, and a minimal parser footprint.
 
 ### Core Message Types (Conceptual)
 
@@ -463,7 +471,7 @@ This section documents how LGP implements the conceptual contract defined in `li
 | Compositor owns DRM device exclusively | This document | Accepted |
 | Frame timing: compositor-driven callback model | This document | Accepted |
 | Surface types: SYSTEM_CHROME, LUNA_ISLAND, APPLICATION_WINDOW, CANVAS_SURFACE | This document | Provisional |
-| LGP wire format: TLV binary, custom schema | DL-025 | Accepted |
+| LGP wire format: TLV binary 6-byte header (2-byte type + 4-byte length) | DL-053 (supersedes DL-025) | Accepted |
 | GPU backend: Vulkan primary, OpenGL/EGL fallback | DL-026 | Accepted |
 ---
 
@@ -501,7 +509,7 @@ An AI agent implementing any Mahina graphical component must understand:
 - **Motion Vocabulary enforcement is at the protocol level.** `LGP_SEND_MOTION` takes a motion class from the locked vocabulary in `core_laws.md`. There is no "custom animation" class. If the required animation is not in the vocabulary, it requires the amendment process before it can be specified.
 - **Animation Budget is enforced by the compositor.** Applications do not need to self-enforce the budget. The compositor will auto-complete over-budget animations. Applications should still respect the budget in their design — an animation that always gets cut off is a design error, not a compositor feature.
 - **LunaGUI is the correct interface for application development.** Direct LGP should only be used for game engines, video renderers, or other components that genuinely need raw surface access. A settings panel written with direct LGP instead of LunaGUI is a misuse of the protocol.
-- **The wire format is TBD.** Do not implement LGP message parsing until the wire format Decision Log entry is recorded. Use stubs or interface definitions that can be filled in once the format is decided.
+- **The wire format uses a 6-byte TLV header.** Per DL-053: 2-byte `uint16_t` type + 4-byte `uint32_t` length. Implementations must use `LGP_HEADER_SIZE = 6`. Do not use the 5-byte format from the superseded DL-025.
 - **luna-island is the reference implementation of Living Interface.** When implementing any other animated surface, its behavior should be derivable from the same LGP primitives that luna-island uses.
 
 ---

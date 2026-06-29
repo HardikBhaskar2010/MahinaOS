@@ -165,6 +165,21 @@ toml_error_t toml_array_table_get(const toml_doc_t *doc, const char *section,
                                    toml_value_t *out);
 
 /*
+ * toml_enumerate_section() — Iterate all key=value entries in a section.
+ *
+ * Calls callback(key, value, userdata) for each entry in the named section.
+ * Used to parse open-ended sections like [service.env] where the set of
+ * keys is not known at compile time.
+ *
+ * Returns the number of entries yielded.
+ */
+typedef void (*toml_enumerate_cb_t)(const char *key,
+                                    const toml_value_t *value,
+                                    void *userdata);
+int toml_enumerate_section(const toml_doc_t *doc, const char *section,
+                            toml_enumerate_cb_t callback, void *userdata);
+
+/*
  * toml_strerror() — Human-readable description of a toml_error_t.
  */
 const char *toml_strerror(toml_error_t err);

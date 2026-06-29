@@ -97,9 +97,13 @@ int main(int argc, char **argv) {
                     }
                 }
             } else if (events[i].data.fd == pipe_fd) {
+                /* Drain all complete messages buffered in this epoll event.
+                 * ipc_read_event() returns one message per call; if two updates
+                 * arrived in the same read(), the second was previously deferred
+                 * until a third update arrived. (CODE_AUDIT_REPORT §5.2) */
                 char msg[MAX_IPC_MSG];
                 int percent;
-                if (ipc_read_event(msg, &percent)) {
+                while (ipc_read_event(msg, &percent)) {
                     render_clear(COLOR_BG);
                     render_logo();
                     render_progress(msg, percent);

@@ -123,6 +123,14 @@ static pid_t spawn_service(service_t *svc) {
                 LUNA_ERROR(COMP, "Service '%s': setgid() failed", svc->name);
                 _exit(127);
             }
+            /* Clear supplementary groups inherited from PID 1 (root). Failing
+             * to call setgroups(0, NULL) would leave the child process with
+             * root's supplementary group list despite the setgid() call, which
+             * is a standard privilege-drop pitfall. (CODE_AUDIT_REPORT §3.2) */
+            if (setgroups(0, NULL) != 0) {
+                LUNA_ERROR(COMP, "Service '%s': setgroups() failed", svc->name);
+                _exit(127);
+            }
         }
 
         if (svc->run_user[0] != '\0') {
@@ -303,6 +311,14 @@ int supervisor_start_one(const char *name) {
     svc->scheduled_start_ms = 0;
 
     supervisor_pump();
+
+    /* Propagate actual spawn failure: if the pump immediately set the service
+     * to DEGRADED (e.g. binary not found), return -1 so callers such as
+     * main.c Stage 5 can log the correct error message. (CODE_AUDIT_REPORT §3.3) */
+    if (svc->state == SERVICE_STATE_DEGRADED ||
+        svc->state == SERVICE_STATE_FAILED) {
+        return -1;
+    }
     return 0;
 }
 

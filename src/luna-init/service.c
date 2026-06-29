@@ -42,11 +42,41 @@ static ready_method_t parse_ready_method(const char *s) {
     return READY_NONE;
 }
 
+/* Context passed to env_cb during [service.env] enumeration. */
+typedef struct {
+    service_t  *svc;
+    const char *path;
+} env_parse_ctx_t;
+
+/* Callback for toml_enumerate_section on the "service.env" section.
+ * Treats every key = "string-value" pair as an environment variable.
+ * (CODE_AUDIT_REPORT §7.1) */
+static void env_cb(const char *key, const toml_value_t *val, void *ud) {
+    env_parse_ctx_t *ctx = (env_parse_ctx_t *)ud;
+    service_t *svc = ctx->svc;
+    if (val->type != TOML_TYPE_STRING) {
+        LUNA_WARN(COMP, "%s: [service.env] key '%s' is not a string — skipped",
+                  ctx->path, key);
+        return;
+    }
+    if (svc->env_count >= SERVICE_MAX_ENV_VARS) {
+        LUNA_WARN(COMP, "%s: [service.env] exceeds limit of %d vars — skipped",
+                  ctx->path, SERVICE_MAX_ENV_VARS);
+        return;
+    }
+    strncpy(svc->env[svc->env_count].key, key,   SERVICE_MAX_ENV_LEN - 1);
+    strncpy(svc->env[svc->env_count].val, val->v.str, SERVICE_MAX_ENV_LEN - 1);
+    svc->env_count++;
+}
+
 static int parse_signal_name(const char *s) {
     if (strcmp(s, "SIGTERM") == 0) return SIGTERM;
     if (strcmp(s, "SIGKILL") == 0) return SIGKILL;
     if (strcmp(s, "SIGHUP")  == 0) return SIGHUP;
     if (strcmp(s, "SIGQUIT") == 0) return SIGQUIT;
+    /* Unrecognized signal name — log and fall back to SIGTERM per spec.
+     * Previously this was a silent failure. (CODE_AUDIT_REPORT §7.2) */
+    LUNA_WARN(COMP, "Unrecognized stop signal name '%s' — defaulting to SIGTERM", s);
     return SIGTERM; /* default per spec */
 }
 
@@ -159,6 +189,13 @@ int service_load_one(const char *path, service_t *out) {
         strncpy(stop_sig_str, v.v.str, sizeof(stop_sig_str) - 1);
     out->stop_signal = parse_signal_name(stop_sig_str);
     GET_INT("service.stop", "timeout_ms", out->stop_timeout_ms);
+
+    /* Environment variables from [service.env]: key = "value" pairs.
+     * Previously this section was documented, struct fields existed, and
+     * supervisor.c consumed them, but service.c never populated them.
+     * (CODE_AUDIT_REPORT §7.1) */
+    env_parse_ctx_t env_ctx = { .svc = out, .path = path };
+    toml_enumerate_section(doc, "service.env", env_cb, &env_ctx);
 
 #undef GET_STR
 #undef GET_INT

@@ -747,7 +747,7 @@ Neither goal may come at the expense of the other.
 
 ## [DL-025] LGP Wire Format — TLV Binary
 **Date:** 2026-06-27
-**Status:** ✅ Accepted
+**Status:** ❌ SUPERSEDED by DL-053 (2026-06-29)
 **Session:** AR-004
 **Supersedes:** DL-P01 (pending)
 
@@ -1460,6 +1460,37 @@ The goal of Mahina is to rethink OS architecture, not to restrict how people use
 - `COPYRIGHT.md` established.
 - All `.c` and `.h` files updated with MIT copyright headers.
 - DL-P04 closed.
+
+---
+
+## [DL-053] LGP Wire Format: 2-byte Type + 4-byte Length Header
+Date: 2026-06-29
+Status: ✅ ACCEPTED — Supersedes DL-025
+Decided by: Hardik Bhaskar
+
+### Question
+DL-025 specified a 1-byte type + 4-byte length (5-byte) TLV header for the Luna Graphics Protocol. The actual implementation in `src/lgp-compositor/protocol/tlv.h` and `tlv.c` uses a 2-byte type + 4-byte length (6-byte) header. Which should be canonical?
+
+### Context
+This discrepancy was identified in the `CODE_AUDIT_REPORT.md` (§1.1) and `ARCHITECTURE_COMPLIANCE_REPORT.md` (§2.1) code audit of 2026-06-29. The 6-byte framing was not a typo — the implementation defines message type constants like `LGP_MSG_ERROR = 0xFFFF` which require a 2-byte type field and cannot fit in 1 byte. The test client was also written to match the 6-byte framing.
+
+### Options Considered
+1. **Revert to 1-byte type field (honor DL-025):** Would require changing message type constants to `uint8_t` values (max 255 message types), redesigning the protocol type namespace, and rewriting `tlv.h`, `tlv.c`, and `test_client.c`. Risk: 255 message types may be too restrictive for a long-lived protocol.
+2. **Accept 2-byte type field and supersede DL-025 (this decision):** Keeps the implementation as-is. Provides 65,535 message types (ample headroom). Aligns with other protocols (e.g. HTTP/2 frame types use 1 byte but have separate opcode namespaces; SPDY, Wayland, and many IPC protocols use ≥2 bytes for type).
+
+### Decision
+Accept the 6-byte TLV header format (2-byte `uint16_t` type + 4-byte `uint32_t` length) as the canonical LGP wire format. DL-025 is superseded by this entry.
+
+### Reasoning
+- The 1-byte type field would immediately limit the protocol to 255 distinct message types. Given the planned scope of LGP (graphics primitives, window management, input events, layer shell, compositor control), 255 types may be reached before the protocol is stable.
+- The implementation is correct and consistent internally. Changing it before any second client is built is low-cost now; changing it later would be breaking.
+- The protocol is append-only and this decision must be made now while no external clients exist.
+
+### Consequences
+- `src/lgp-compositor/protocol/tlv.h`: `LGP_HEADER_SIZE` remains `6`. `lgp_msg_t.type` remains `uint16_t`.
+- `docs/DCKL/Volume III - Graphics & Presence/01_lgp.md`: Update §Wire Format (line 162) to document 2-byte type field.
+- All future LGP clients must use the 6-byte framing.
+- DL-025 marked as: **Status: SUPERSEDED by DL-053**
 
 ---
 

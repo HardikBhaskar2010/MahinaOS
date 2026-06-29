@@ -193,10 +193,13 @@ void render_logo(void) {
                  * ╝ = E2 95 9D
                  */
                 if (p[1] == (char)0x96 && p[2] == (char)0x88) {
-                    /* Full block */
+                    /* Full block — use put_pixel() so bpp is handled correctly.
+                     * Previously used fb_mem[(y * line_length / 4) + x] which
+                     * assumed 32bpp and could write out of bounds at other depths.
+                     * (CODE_AUDIT_REPORT §5.1) */
                     for (int cy = 0; cy < 16; cy++) {
-                        uint32_t *row = fb_mem + ((cur_y + cy) * line_length / 4);
-                        for (int cx = 0; cx < 8; cx++) row[cur_x + cx] = COLOR_BRAND;
+                        for (int cx = 0; cx < 8; cx++)
+                            put_pixel(cur_x + cx, cur_y + cy, COLOR_BRAND);
                     }
                 } else if (p[1] == (char)0x95) {
                     /* Line drawing chars: for Stage 0, just draw them as partial blocks */
@@ -210,8 +213,8 @@ void render_logo(void) {
                     if (t == (char)0x91) { start_x = 2; end_x = 6; start_y = 0; end_y = 16; } /* ║ */
                     
                     for (int cy = start_y; cy < end_y; cy++) {
-                        uint32_t *row = fb_mem + ((cur_y + cy) * line_length / 4);
-                        for (int cx = start_x; cx < end_x; cx++) row[cur_x + cx] = COLOR_BRAND;
+                        for (int cx = start_x; cx < end_x; cx++)
+                            put_pixel(cur_x + cx, cur_y + cy, COLOR_BRAND);
                     }
                 }
                 cur_x += 8;
@@ -228,11 +231,11 @@ void render_logo(void) {
 void render_progress(const char *msg, int percent) {
     int center_y = screen_h / 2 + 20;
     
-    /* Clear the area first */
+    /* Clear the progress area first.
+     * Route through put_pixel() to avoid 32bpp assumption. (CODE_AUDIT_REPORT §5.1) */
     for (int y = center_y; y < center_y + 60; y++) {
-        uint32_t *row = fb_mem + (y * line_length / 4);
         for (int x = 0; x < screen_w; x++) {
-            row[x] = COLOR_BG;
+            put_pixel(x, y, COLOR_BG);
         }
     }
     
@@ -245,17 +248,15 @@ void render_progress(const char *msg, int percent) {
     int bar_y = center_y + 30;
     
     for (int y = bar_y; y < bar_y + bar_h; y++) {
-        uint32_t *row = fb_mem + (y * line_length / 4);
         for (int x = bar_x; x < bar_x + bar_w; x++) {
-            row[x] = COLOR_BAR_BG;
+            put_pixel(x, y, COLOR_BAR_BG);
         }
     }
     
     int fill_w = (bar_w * percent) / 100;
     for (int y = bar_y; y < bar_y + bar_h; y++) {
-        uint32_t *row = fb_mem + (y * line_length / 4);
         for (int x = bar_x; x < bar_x + fill_w; x++) {
-            row[x] = COLOR_BRAND;
+            put_pixel(x, y, COLOR_BRAND);
         }
     }
 }
