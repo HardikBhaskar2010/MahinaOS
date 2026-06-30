@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <string.h>
 
 static uint8_t *g_font_data = NULL;
 static uint32_t g_glyph_height = 16;
@@ -50,14 +51,14 @@ void lgui_font_draw_text(lgui_canvas_t *canvas, int x, int y, const char *text, 
                 if (py < clip_y || py >= clip_y + clip_h) continue;
 
                 uint8_t row = glyph[r];
-                uint32_t *dst = (uint32_t *)((uint8_t *)canvas->pixels + py * canvas->stride);
+                uint8_t *dst = (uint8_t *)canvas->pixels + py * canvas->stride;
                 
                 for (int c = 0; c < 8; c++) {
                     int px = cx + c;
                     if (px < clip_x || px >= clip_x + clip_w) continue;
 
                     if (row & (1 << (7 - c))) {
-                        dst[px] = color;
+                        memcpy(dst + px * 4, &color, 4);
                     }
                 }
             }
