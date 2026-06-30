@@ -248,7 +248,6 @@ image: all
 QEMU_MEMORY  := 2G
 QEMU_CPUS    := 2
 QEMU_DISK    := build/mahina-$(MAHINA_VERSION).img
-QEMU_SERIAL  := -serial stdio
 QEMU_FLAGS   := \
     -machine q35 \
     -cpu qemu64 \
@@ -258,16 +257,14 @@ QEMU_FLAGS   := \
     -net nic,model=virtio \
     -net user \
     -bios /usr/share/ovmf/OVMF.fd \
-    $(QEMU_SERIAL) \
     -vga virtio \
-    -display gtk \
     -no-reboot
 
 run-qemu: image
 	@echo "  QEMU    Starting Mahina in QEMU..."
 	@echo "  QEMU    Serial console: this terminal"
 	@echo "  QEMU    Display: gtk window"
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-x86_64 $(QEMU_FLAGS) -display gtk -serial stdio
 
 # Run QEMU without display (headless — for CI/automated testing)
 run-qemu-headless: image

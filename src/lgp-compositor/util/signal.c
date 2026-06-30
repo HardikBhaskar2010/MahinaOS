@@ -9,7 +9,7 @@
 #include "../logging/log.h"
 
 #include <errno.h>
-#include <signal.h>
+#include <signal.h> // NOLINT(readability-duplicate-include)
 #include <string.h>
 #include <sys/signalfd.h>
 #include <unistd.h>

@@ -132,6 +132,10 @@ echo "video:x:44:" | sudo tee -a "$MNT_ROOT/etc/group" >/dev/null
 sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/"
 if [ -f "${BUILD_DIR}/vmlinuz-mahina" ]; then
     sudo cp "${BUILD_DIR}/vmlinuz-mahina" "$MNT_ROOT/boot/efi/"
+elif ls /boot/vmlinuz-* 1> /dev/null 2>&1; then
+    echo "  IMAGE   WARNING: vmlinuz-mahina not found. Using host kernel for testing."
+    HOST_KERNEL=$(ls -1 /boot/vmlinuz-* | grep -v "\.old" | head -n 1)
+    sudo cp "$HOST_KERNEL" "$MNT_ROOT/boot/efi/vmlinuz-mahina"
 else
     echo "  IMAGE   WARNING: vmlinuz-mahina not found. Kernel must be provided separately."
     # We will create a dummy kernel so Limine doesn't immediately crash before we can see its menu

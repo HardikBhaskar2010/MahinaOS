@@ -303,14 +303,14 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                 if (surface->pixel_format == LGP_PIXEL_FORMAT_ARGB8888) {
                     for (uint32_t px = 0; px < surface->width; px++) {
                         uint32_t src_px;
-                        memcpy(&src_px, src_row + px * 4, 4);
+                        memcpy(&src_px, src_row + (size_t)px * 4, 4);
                         uint32_t alpha = src_px >> 24;
                         
                         if (alpha == 255) {
-                            memcpy(dst_row + px * 4, &src_px, 4);
+                            memcpy(dst_row + (size_t)px * 4, &src_px, 4);
                         } else if (alpha > 0) {
                             uint32_t d_px;
-                            memcpy(&d_px, dst_row + px * 4, 4);
+                            memcpy(&d_px, dst_row + (size_t)px * 4, 4);
                             
                             uint32_t s_r = (src_px >> 16) & 0xFF;
                             uint32_t s_g = (src_px >> 8) & 0xFF;
@@ -325,7 +325,7 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                             uint32_t b = (s_b * alpha + d_b * inv_alpha) / 255;
                             
                             uint32_t out_px = (r << 16) | (g << 8) | b;
-                            memcpy(dst_row + px * 4, &out_px, 4);
+                            memcpy(dst_row + (size_t)px * 4, &out_px, 4);
                         }
                     }
                 } else if (surface->pixel_format == LGP_PIXEL_FORMAT_XRGB8888) {
