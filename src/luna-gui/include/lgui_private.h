@@ -20,6 +20,10 @@ struct lgui_application_t {
     /* Capabilities granted by compositor during HELLO handshake */
     uint32_t caps_granted;
 
+    /* Current pointer position (updated by POINTER_MOTION events) */
+    int cursor_x;
+    int cursor_y;
+
     struct lgui_window_t *windows[16];
     int window_count;
 

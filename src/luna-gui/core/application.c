@@ -229,6 +229,62 @@ void lgui_application_add_fd(lgui_application_t *app, int fd, lgui_fd_callback_t
     app->custom_fd_count++;
 }
 
+/* ---------------------------------------------------------------------------
+ * Widget hit-testing and input routing
+ * ---------------------------------------------------------------------------*/
+
+/*
+ * lgui_widget_hittest() — Find the deepest widget under screen-space (x,y)
+ * within the widget tree rooted at `w`. `ox/oy` is the accumulated offset
+ * for this subtree. Returns the matching widget or NULL.
+ */
+static lgui_widget_t *lgui_widget_hittest(lgui_widget_t *w,
+                                           int ox, int oy,
+                                           int x, int y) {
+    if (!w) return NULL;
+
+    int wx = ox + w->x;
+    int wy = oy + w->y;
+
+    /* Check children first (front-to-back order) */
+    for (int i = w->child_count - 1; i >= 0; i--) {
+        lgui_widget_t *hit = lgui_widget_hittest(w->children[i], wx, wy, x, y);
+        if (hit) return hit;
+    }
+
+    /* Check this widget */
+    if (x >= wx && x < wx + w->width &&
+        y >= wy && y < wy + w->height) {
+        return w;
+    }
+
+    return NULL;
+}
+
+/*
+ * lgui_dispatch_pointer_button() — Route a compositor POINTER_BUTTON event
+ * to the widget under the cursor, calling its on_click handler if it has one.
+ */
+static void lgui_dispatch_pointer_button(lgui_application_t *app,
+                                          int x, int y, bool pressed) {
+    if (!pressed) return; /* Only fire on button-down */
+
+    for (int i = 0; i < app->window_count; i++) {
+        lgui_window_t *win = app->windows[i];
+        if (!win || !win->root_widget) continue;
+
+        lgui_widget_t *hit = lgui_widget_hittest(win->root_widget, 0, 0, x, y);
+        if (hit && hit->type == 2 /* Button */ && hit->on_click) {
+            hit->on_click(hit, hit->user_data);
+            /* Window tree may have changed; mark all windows dirty */
+            for (int j = 0; j < app->window_count; j++) {
+                if (app->windows[j]) app->windows[j]->dirty = true;
+            }
+            return;
+        }
+    }
+}
+
 int lgui_application_run(lgui_application_t *app) {
     if (!app) return -1;
     app->running = true;
@@ -273,10 +329,27 @@ int lgui_application_run(lgui_application_t *app) {
 
                 if (len < LGP_HEADER_SIZE || offset + len > (size_t)n) break;
 
-                if (type == 0x0110u || type == 0x0111u) {
-                    /* POINTER_MOTION / POINTER_BUTTON — route to focused window */
-                    /* TODO(Phase B): implement hit-test and on_click routing */
-                    (void)0;
+                const uint8_t *payload = rx + offset + LGP_HEADER_SIZE;
+                uint32_t payload_len = len - (uint32_t)LGP_HEADER_SIZE;
+
+                if (type == 0x0110u) {
+                    /* LGP_MSG_POINTER_MOTION: int32_t x, int32_t y (big-endian per compositor) */
+                    if (payload_len >= 8u) {
+                        int px = (int)((uint32_t)payload[0] << 24 | (uint32_t)payload[1] << 16
+                                     | (uint32_t)payload[2] << 8 | (uint32_t)payload[3]);
+                        int py = (int)((uint32_t)payload[4] << 24 | (uint32_t)payload[5] << 16
+                                     | (uint32_t)payload[6] << 8 | (uint32_t)payload[7]);
+                        app->cursor_x = px;
+                        app->cursor_y = py;
+                    }
+                } else if (type == 0x0111u) {
+                    /* LGP_MSG_POINTER_BUTTON: uint8_t button, uint8_t pressed */
+                    if (payload_len >= 2u) {
+                        bool pressed = payload[1] != 0u;
+                        lgui_dispatch_pointer_button(app,
+                                                      app->cursor_x, app->cursor_y,
+                                                      pressed);
+                    }
                 }
                 offset += len;
             }
