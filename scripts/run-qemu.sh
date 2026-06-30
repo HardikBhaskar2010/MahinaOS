@@ -38,6 +38,7 @@ fi
 echo "  QEMU    Using OVMF: $OVMF_PATH"
 
 qemu-system-x86_64 \
+    -machine q35 \
     -enable-kvm \
     -m 4G \
     -cpu host \
