@@ -26,6 +26,7 @@ struct lgui_window_t {
     uint32_t layer;
     lgui_widget_t *root_widget;
     bool dirty; /* true when the widget tree has changed and needs re-render */
+    bool argb;  /* if true, use ARGB8888 pixel format for alpha compositing */
     int    buffer_fd;
     void  *buffer_map;
     size_t buffer_size;

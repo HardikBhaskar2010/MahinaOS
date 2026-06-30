@@ -188,6 +188,20 @@ void lgui_application_set_output_geometry_cb(lgui_application_t *app, lgui_outpu
 /* ── Window extensions ────────────────────────────────────────────────────── */
 lgui_canvas_t *lgui_window_get_canvas(lgui_window_t *win);
 
+/*
+ * lgui_window_set_argb() — Enable ARGB8888 pixel format for this window.
+ * Must be called before lgui_window_show(). Allows alpha-blended windows
+ * (glassmorphism / translucent terminals).
+ */
+void lgui_window_set_argb(lgui_window_t *win, bool argb);
+
+/*
+ * lgui_window_get_pixels() — Get a pointer to the raw pixel buffer.
+ * Returns NULL if the window has not been initialised.
+ * The buffer is width*height*4 bytes in XRGB8888 (or ARGB8888 if argb flag set).
+ */
+void *lgui_window_get_pixels(lgui_window_t *win);
+
 /* ── Canvas extensions ────────────────────────────────────────────────────── */
 void lgui_canvas_push_clip(lgui_canvas_t *canvas, int x, int y, int w, int h);
 void lgui_canvas_pop_clip(lgui_canvas_t *canvas);

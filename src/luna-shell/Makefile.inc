@@ -1,12 +1,16 @@
 # ---------------------------------------------------------------------------
-# luna-shell (Desktop Shell & WM)
+# luna-shell (Desktop Shell & WM — Luna Island)
 # ---------------------------------------------------------------------------
 
 LUNA_SHELL_SRC := $(SRC_DIR)/luna-shell
 BUILD_LUNA_SHELL := $(BUILD_DIR)/luna-shell
 
 LUNA_SHELL_SOURCES := \
-    $(LUNA_SHELL_SRC)/main.c
+    $(LUNA_SHELL_SRC)/main.c \
+    $(LUNA_SHELL_SRC)/wallpaper.c \
+    $(LUNA_SHELL_SRC)/dock.c \
+    $(LUNA_SHELL_SRC)/decorations.c \
+    $(LUNA_SHELL_SRC)/topbar.c
 
 LUNA_SHELL_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNA_SHELL_SOURCES))
 

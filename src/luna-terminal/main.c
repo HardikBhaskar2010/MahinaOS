@@ -85,10 +85,10 @@ static void terminal_render_cb(lgui_widget_t *widget, lgui_canvas_t *canvas, int
             uint32_t bg = cell.bg;
             uint32_t fg = cell.fg;
 
-            /* Draw background */
-            if (bg != 0xFF1E1E28u) {
-                lgui_canvas_fill_rect(canvas, cell_x, cell_y, TERM_FONT_W, TERM_FONT_H, bg);
-            }
+            /* Draw background — use ARGB dark acrylic base:
+             * 0xCC1E1E28 = 80% opacity dark purple-black */
+            uint32_t draw_bg = (bg != 0xFF1E1E28u) ? bg : 0xCC1E1E28u;
+            lgui_canvas_fill_rect(canvas, cell_x, cell_y, TERM_FONT_W, TERM_FONT_H, draw_bg);
 
             /* Draw foreground character */
             if (cell.ch >= 0x20u && cell.ch < 0x7Fu) {
@@ -225,9 +225,33 @@ int main(void) {
     lgui_window_set_root_widget(g_win, canvas_widget);
     lgui_widget_focus(g_app, canvas_widget);
 
+    /* Enable ARGB for translucent (acrylic) background */
+    lgui_window_set_argb(g_win, true);
+
     /* Initial render */
     render_grid();
     lgui_window_show(g_win);
+
+    /* Write a neofetch-style welcome banner to the terminal */
+    if (g_pty_fd >= 0) {
+        /* ANSI escape sequences for colours:
+         * \x1b[35m = magenta, \x1b[36m = cyan, \x1b[37m = white, \x1b[0m = reset */
+        const char *banner =
+            "\r\n"
+            "\x1b[35m  __ __ __    __   _____ ___  ____\x1b[0m\r\n"
+            "\x1b[35m |  V  |  |  | | |  |  |   ||  |-'\x1b[0m\r\n"
+            "\x1b[35m |  |  |  |__| |_|  |  | | ||  |  \x1b[0m\r\n"
+            "\x1b[35m |__|__|_____|_____|__|_|___||__|  \x1b[0m\r\n"
+            "\x1b[36m       Luna Island v0.3 Desktop\x1b[0m\r\n"
+            "\r\n"
+            "\x1b[37m  OS:\x1b[0m   MahinaOS (Luna Island)\r\n"
+            "\x1b[37m  Shell:\x1b[0m /bin/sh\r\n"
+            "\x1b[37m  Term:\x1b[0m  luna-terminal (80x24)\r\n"
+            "\x1b[37m  Theme:\x1b[0m Cyberpunk Dark / Neon Magenta\r\n"
+            "\x1b[36m  \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88 Mahina  \x1b[35m\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88 Luna\x1b[0m\r\n"
+            "\r\n";
+        write(g_pty_fd, banner, strlen(banner));
+    }
 
     lgui_application_run(g_app);
     lgui_application_destroy(g_app);

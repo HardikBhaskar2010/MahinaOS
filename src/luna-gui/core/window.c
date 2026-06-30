@@ -45,6 +45,8 @@
 
 /* XRGB8888 pixel format (four_cc: 'X', 'R', '2', '4') */
 #define LGP_PIXEL_FORMAT_XRGB8888 0x34325258u
+/* ARGB8888 pixel format (four_cc: 'A', 'R', '2', '4') */
+#define LGP_PIXEL_FORMAT_ARGB8888 0x34325241u
 
 /* lgui_window_t struct is defined in include/window_private.h */
 
@@ -102,10 +104,13 @@ static bool lgui_read_exact(int fd, uint8_t *buf, size_t len) {
 /* Send a COMMIT_BUFFER message with the memfd passed as SCM_RIGHTS ancillary data. */
 static bool lgui_send_commit(int lgp_fd, uint32_t surface_id,
                              uint32_t width, uint32_t height,
-                             uint32_t stride, size_t byte_size, int buffer_fd) {
+                             uint32_t stride, size_t byte_size, int buffer_fd,
+                             bool argb) {
     /* COMMIT_BUFFER payload: surface_id, width, height, stride, pixel_fmt, byte_size */
     const uint32_t payload_len  = 6u * 4u;  /* 6 × uint32_t */
     const uint32_t total_len    = (uint32_t)LGP_HEADER_SIZE + payload_len;
+
+    uint32_t pixel_fmt = argb ? LGP_PIXEL_FORMAT_ARGB8888 : LGP_PIXEL_FORMAT_XRGB8888;
 
     uint8_t cbuf[LGP_HEADER_SIZE + 6u * 4u];
     write_u16_le(cbuf + 0, (uint16_t)LGP_MSG_COMMIT_BUFFER);
@@ -114,7 +119,7 @@ static bool lgui_send_commit(int lgp_fd, uint32_t surface_id,
     write_u32_le(cbuf + 10, width);
     write_u32_le(cbuf + 14, height);
     write_u32_le(cbuf + 18, stride);
-    write_u32_le(cbuf + 22, LGP_PIXEL_FORMAT_XRGB8888);
+    write_u32_le(cbuf + 22, pixel_fmt);
     write_u32_le(cbuf + 26, (uint32_t)byte_size);
 
     /* Pass the buffer fd via SCM_RIGHTS */
@@ -145,8 +150,13 @@ static bool lgui_send_commit(int lgp_fd, uint32_t surface_id,
 static void lgui_window_render_internal(lgui_window_t *win) {
     if (!win || !win->canvas) return;
 
-    /* Fill with Mahina dark background (#1E1E28) */
-    lgui_canvas_fill_rect(win->canvas, 0, 0, (int)win->width, (int)win->height, 0xFF1E1E28u);
+    /* Fill with Mahina dark background (#1E1E28) for opaque windows.
+     * ARGB windows start transparent so the compositor blends them over layers below. */
+    if (!win->argb) {
+        lgui_canvas_fill_rect(win->canvas, 0, 0, (int)win->width, (int)win->height, 0xFF1E1E28u);
+    } else {
+        lgui_canvas_fill_rect(win->canvas, 0, 0, (int)win->width, (int)win->height, 0x00000000u);
+    }
 
     if (win->root_widget) {
         lgui_widget_t *root = win->root_widget;
@@ -315,7 +325,8 @@ void lgui_window_show(lgui_window_t *win) {
 
     /* --- Step 4: Send COMMIT_BUFFER ------------------------------------- */
     if (!lgui_send_commit(lgp_fd, surface_id, win->width, win->height,
-                          win->width * 4u, win->buffer_size, win->buffer_fd)) {
+                          win->width * 4u, win->buffer_size, win->buffer_fd,
+                          win->argb)) {
         fprintf(stderr, "lunagui: failed to send COMMIT_BUFFER\n");
     }
 }
@@ -323,6 +334,15 @@ void lgui_window_show(lgui_window_t *win) {
 lgui_canvas_t *lgui_window_get_canvas(lgui_window_t *win) {
     if (!win) return NULL;
     return win->canvas;
+}
+
+void *lgui_window_get_pixels(lgui_window_t *win) {
+    if (!win) return NULL;
+    return win->buffer_map;
+}
+
+void lgui_window_set_argb(lgui_window_t *win, bool argb) {
+    if (win) win->argb = argb;
 }
 
 void lgui_window_update(lgui_window_t *win) {
@@ -336,5 +356,6 @@ void lgui_window_update(lgui_window_t *win) {
                      win->width, win->height,
                      win->width * 4u,
                      win->buffer_size,
-                     win->buffer_fd);
+                     win->buffer_fd,
+                     win->argb);
 }
