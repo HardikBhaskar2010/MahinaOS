@@ -35,8 +35,8 @@ void lgp_log_close(void) {
 }
 
 void lgp_log(lgp_log_level_t level, const char *component, const char *fmt, ...) {
-    if (g_log_fd < 0) return;
-
+    /* Always format log even if g_log_fd is closed, so we can write to stderr */
+    
     /* Get current time */
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -75,11 +75,14 @@ void lgp_log(lgp_log_level_t level, const char *component, const char *fmt, ...)
             }
             buf[len++] = '\n';
             buf[len] = '\0';
-            write(g_log_fd, buf, len);
+            if (g_log_fd >= 0) {
+                write(g_log_fd, buf, len);
+            }
+            write(STDERR_FILENO, buf, len);
         }
     }
 
-    if (level == LOG_FATAL) {
+    if (level == LOG_FATAL && g_log_fd >= 0) {
         fsync(g_log_fd);
     }
 }

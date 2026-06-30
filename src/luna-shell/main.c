@@ -153,7 +153,8 @@ int main(int argc, char **argv) {
     lgui_window_set_root_widget(shell.topbar, hbox);
     lgui_window_show(shell.topbar);
     
-    printf("luna-shell: Initialization complete. Running event loop.\n");
+    printf("luna-shell: Initialization complete. Auto-launching terminal.\n");
+    launch_terminal();
     lgui_application_run(shell.app);
     
     lgui_application_destroy(shell.app);

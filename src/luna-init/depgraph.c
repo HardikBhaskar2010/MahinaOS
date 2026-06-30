@@ -168,9 +168,9 @@ int depgraph_topo_sort(int *out_order, int max_count) {
         return -1;
     }
 
-    LUNA_INFO(COMP, "Start order resolved (%d services):", out_count);
+    LUNA_DEBUG(COMP, "Start order resolved (%d services):", out_count);
     for (int i = 0; i < out_count; i++) {
-        LUNA_INFO(COMP, "  [%d] %s", i + 1, g_services[out_order[i]].name);
+        LUNA_DEBUG(COMP, "  [%d] %s", i + 1, g_services[out_order[i]].name);
     }
 
     return out_count;

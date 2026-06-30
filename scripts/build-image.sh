@@ -129,7 +129,10 @@ echo "root:x:0:" | sudo tee "$MNT_ROOT/etc/group" >/dev/null
 echo "video:x:44:" | sudo tee -a "$MNT_ROOT/etc/group" >/dev/null
 
 # Copy bootloader, kernel, initramfs
+# Copy limine config to all locations different Limine versions may check
 sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/"
+sudo mkdir -p "$MNT_ROOT/boot/efi/boot/limine"
+sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/boot/limine/"
 if [ -f "${BUILD_DIR}/vmlinuz-mahina" ]; then
     sudo cp "${BUILD_DIR}/vmlinuz-mahina" "$MNT_ROOT/boot/efi/"
 elif ls /boot/vmlinuz-* 1> /dev/null 2>&1; then
@@ -146,15 +149,17 @@ sudo cp "${BUILD_DIR}/initramfs-mahina.img" "$MNT_ROOT/boot/efi/"
 # Setup limine bootloader
 # (Assumes limine binary is available on host, or downloaded. For this script,
 # we fetch a prebuilt limine binary if not present)
-if [ ! -f "${BUILD_DIR}/limine/limine" ]; then
+if [ ! -f "${BUILD_DIR}/limine/BOOTX64.EFI" ]; then
     echo "  IMAGE   Downloading limine bootloader..."
     rm -rf "${BUILD_DIR}/limine"
-    git clone --depth 1 -b v8.x-binary https://github.com/limine-bootloader/limine.git "${BUILD_DIR}/limine" >/dev/null 2>&1
+    git clone --depth 1 -b v5.x-branch-binary https://github.com/limine-bootloader/limine.git "${BUILD_DIR}/limine" > /dev/null 2>&1
 fi
 
 sudo mkdir -p "$MNT_ROOT/boot/efi/EFI/BOOT"
 sudo cp "${BUILD_DIR}/limine/BOOTX64.EFI" "$MNT_ROOT/boot/efi/EFI/BOOT/"
 sudo cp "${BUILD_DIR}/limine/BOOTIA32.EFI" "$MNT_ROOT/boot/efi/EFI/BOOT/" 2>/dev/null || true
+sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/EFI/BOOT/"
+sudo cp boot/limine.conf "$MNT_ROOT/boot/efi/EFI/BOOT/limine.cfg"
 
 # Unmount
 sudo umount "$MNT_ROOT/boot/efi"

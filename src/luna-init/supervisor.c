@@ -264,6 +264,21 @@ bool supervisor_is_boot_complete(void) {
     for (int i = 0; i < g_service_count; i++) {
         if (g_services[i].state == SERVICE_STATE_PENDING || 
             g_services[i].state == SERVICE_STATE_STARTING) {
+            
+            /* If this service is blocked by a STOPPED service (like lgp-compositor),
+               do not let it hold up Stage 4 completion. */
+            bool blocked_by_stopped = false;
+            for (int j = 0; j < g_services[i].after_count; j++) {
+                service_t *dep = service_find(g_services[i].after[j]);
+                if (dep && dep->state == SERVICE_STATE_STOPPED) {
+                    blocked_by_stopped = true;
+                    break;
+                }
+            }
+            if (blocked_by_stopped) {
+                continue;
+            }
+            
             return false;
         }
     }
