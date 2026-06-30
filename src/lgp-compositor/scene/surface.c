@@ -302,14 +302,16 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                 
                 if (surface->pixel_format == LGP_PIXEL_FORMAT_ARGB8888) {
                     for (uint32_t px = 0; px < surface->width; px++) {
-                        uint32_t *dst_ptr = (uint32_t *)(dst_row + px * 4);
-                        uint32_t src_px = ((const uint32_t *)src_row)[px];
+                        uint32_t src_px;
+                        memcpy(&src_px, src_row + px * 4, 4);
                         uint32_t alpha = src_px >> 24;
                         
                         if (alpha == 255) {
-                            *dst_ptr = src_px;
+                            memcpy(dst_row + px * 4, &src_px, 4);
                         } else if (alpha > 0) {
-                            uint32_t d_px = *dst_ptr;
+                            uint32_t d_px;
+                            memcpy(&d_px, dst_row + px * 4, 4);
+                            
                             uint32_t s_r = (src_px >> 16) & 0xFF;
                             uint32_t s_g = (src_px >> 8) & 0xFF;
                             uint32_t s_b = src_px & 0xFF;
@@ -318,14 +320,15 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                             uint32_t d_b = d_px & 0xFF;
                             
                             uint32_t inv_alpha = 255 - alpha;
-                            uint32_t out_r = (s_r * alpha + d_r * inv_alpha) / 255;
-                            uint32_t out_g = (s_g * alpha + d_g * inv_alpha) / 255;
-                            uint32_t out_b = (s_b * alpha + d_b * inv_alpha) / 255;
+                            uint32_t r = (s_r * alpha + d_r * inv_alpha) / 255;
+                            uint32_t g = (s_g * alpha + d_g * inv_alpha) / 255;
+                            uint32_t b = (s_b * alpha + d_b * inv_alpha) / 255;
                             
-                            *dst_ptr = (out_r << 16) | (out_g << 8) | out_b;
+                            uint32_t out_px = (r << 16) | (g << 8) | b;
+                            memcpy(dst_row + px * 4, &out_px, 4);
                         }
                     }
-                } else {
+                } else if (surface->pixel_format == LGP_PIXEL_FORMAT_XRGB8888) {
                     memcpy(dst_row, src_row, (size_t)surface->width * LGP_BYTES_PER_PIXEL_XRGB8888);
                 }
             }
