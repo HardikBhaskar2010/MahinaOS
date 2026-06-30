@@ -1,6 +1,6 @@
 # IMPLEMENTATION_STATUS.md — Mahina OS
 **Living Engineering Dashboard. Update after every major milestone.**
-**Generated:** 2026-06-28 | **Version:** 0.1.0 (Waxing)
+**Generated:** 2026-06-30 | **Version:** 0.1.0 (Waxing)
 
 ---
 
@@ -9,8 +9,13 @@
 | Phase | Status | Progress |
 |---|---|---|
 | Phase 0: Core Foundation | ✅ COMPLETE | ~95% |
-| Phase 1: Boot Aesthetics | 🔵 IN PROGRESS | ~70% |
-| Phase 2: Graphics Layer | 🔵 IN PROGRESS | ~20% |
+| Phase 1: Boot Aesthetics | ✅ COMPLETE | ~100% |
+| Phase 2: Graphics Layer — LGP | 🔵 IN PROGRESS | ~45% |
+| Phase 2: LunaGUI Toolkit | 🔵 IN PROGRESS | ~60% |
+| Phase 2: Desktop Shell | 🔵 IN PROGRESS | ~25% |
+| Phase 2: Installer | ✅ COMPLETE (UI) | 100% UI / 0% backend |
+| Phase 2: Terminal | 🔵 IN PROGRESS | ~70% |
+| Phase 2: Core Applications | ✅ COMPLETE (P7) | 6/6 apps implemented |
 | Phase 3: AI & Shell | ⬜ NOT STARTED | 0% |
 | Phase 4: Public Release | ⬜ NOT STARTED | 0% |
 
@@ -203,31 +208,96 @@ DL-025 for the LGP wire format; the code uses the canonical 6-byte TLV header
 
 ### LunaGUI
 
-**Status:** ⬜ NOT STARTED
-**Completion:** 0%
+**Status:** 🔵 IN PROGRESS
+**Completion:** ~60%
 **Estimated Complexity:** Very High
-**Next Task:** After lgp-compositor socket is working, implement LunaGUI client library.
+**Last Updated:** 2026-06-30
 
-| Subsystem | Status | Authority |
+| Subsystem | Status | Notes |
 |---|---|---|
-| LGP client library | ⬜ | Volume III/04_lunagui.md |
-| FreeType + HarfBuzz text | ⬜ | DL-029 |
-| Flexbox layout engine | ⬜ | DL-030 |
-| Phosphor Icons SVG renderer | ⬜ | DL-051 |
-| Bitcount + Inter font loading | ⬜ | DL-028, DL-050 |
-| Widget set (panels, buttons, etc.) | ⬜ | Volume III/04_lunagui.md |
-| Keyboard navigation (AT-SPI2 v1) | ⬜ | DL-040 |
-| Theme engine | ⬜ | DL-039 (Luna Dark only) |
-| LGP_THEME_CHANGED handling | ⬜ | DL-037 |
+| lgui_application_t (core) | ✅ Complete | LGP connect, HELLO handshake, poll() event loop |
+| lgui_window_t (surface) | ✅ Complete | CREATE_SURFACE, memfd + SCM_RIGHTS, COMMIT_BUFFER |
+| lgui_canvas_t (rendering) | ✅ Complete | fill_rect, draw_text (PSF font), draw_rect_outline |
+| Widget: Label | ✅ Complete | Text display |
+| Widget: Button | ✅ Complete | Click callback, on_click routing |
+| Widget: VBox | ✅ Complete | Vertical stack with padding |
+| Widget: HBox | ✅ Complete | Horizontal stack with flex distribution |
+| lgui_widget_destroy() | ✅ Complete | Recursive tree free (prevents memory leaks on page nav) |
+| lgui_widget_set_size() | ✅ Complete | Explicit dimension override |
+| lgui_application_quit() | ✅ Complete | Signal event loop to stop |
+| Input event routing | ✅ Complete | POINTER_MOTION (cursor_x/y) + POINTER_BUTTON → hit-test → on_click |
+| Widget hit-testing | ✅ Complete | lgui_widget_hittest() recursive depth-first search |
+| Render system | ✅ Complete | Mahina Design System palette, VBox/HBox layout engines |
+| LGUI_LAYER_* constants | ✅ Complete | Matches lgp-compositor layer definitions |
+| Theme engine | ⬜ Future | DL-039 (Luna Dark only); color palette defined in render.c |
+| Animation engine | ⬜ Future | Deferred post-Phase 2 |
+| Image loading | ⬜ Future | No image widget yet; requires PNG/SVG loader |
+| Keyboard events | ⬜ Future | Phase E; requires compositor keyboard routing |
+| Text input widget | ⬜ Future | Requires keyboard events |
+| Scroll container | ⬜ Future | Needed by file manager (scrollable list) |
+| FreeType text | ⬜ Future | DL-029; currently using embedded PSF 8×16 bitmap font |
+
+### luna-installer
+
+**Status:** ✅ COMPLETE (UI — backend stubbed)
+**Completion:** 100% UI / 0% disk write backend
+**Last Updated:** 2026-06-30
+
+| Page | Status |
+|---|---|
+| 0. Welcome | ✅ |
+| 1. Language | ✅ |
+| 2. Keyboard | ✅ |
+| 3. Timezone | ✅ |
+| 4. Disk Selection | ✅ |
+| 5. Partitioning Summary | ✅ |
+| 6. User Creation | ✅ |
+| 7. Summary | ✅ |
+| 8. Installation Progress | ✅ (simulated) |
+| 9. Complete / Reboot | ✅ |
+| Actual disk write (mkfs, debootstrap) | ⬜ Future |
+
+### luna-terminal
+
+**Status:** 🔵 IN PROGRESS
+**Completion:** ~70%
+**Last Updated:** 2026-06-30
+
+| Feature | Status | Notes |
+|---|---|---|
+| PTY (forkpty) | ✅ Complete | pty.c spawns /bin/sh |
+| ANSI escape parser | ✅ Complete | State machine in ansi.c |
+| Cursor movement (A/B/C/D/H/f) | ✅ Complete | |
+| Erase sequences (J/K 0/1/2) | ✅ Complete | |
+| SGR colors (8+8 ANSI palette) | ✅ Complete | |
+| Bold, cursor show/hide | ✅ Complete | |
+| Scrollback buffer | ✅ Complete | 2000-line circular buffer |
+| PTY resize (TIOCSWINSZ) | ✅ Complete | |
+| Cell grid rendering | ⚠️ Text-only | Full pixel rendering deferred (needs lgui_window_get_canvas()) |
+| Copy/paste | ⬜ Future | Needs clipboard LGP message |
+| Multiple sessions | ⬜ Future | Needs tab bar widget |
+| Keyboard input (type into shell) | ⬜ Future | Needs Phase E keyboard events |
+
+### Core Applications (Priority 7)
+
+**Status:** ✅ COMPLETE (all 6 implemented)
+**Last Updated:** 2026-06-30
+
+| Application | Status | Notes |
+|---|---|---|
+| luna-settings | ✅ Complete | 6 pages: Display, Network, Audio, Users, About |
+| luna-files | ✅ Complete | POSIX file browser, directory navigation |
+| luna-calc | ✅ Complete | 4-function calculator with real expression evaluation |
+| luna-text | ✅ Complete | File viewer, page-based scroll, up to 2000 lines |
+| luna-about | ✅ Complete | Reads live /proc data (CPU, RAM, kernel, hostname) |
+| luna-tasks | ✅ Complete | /proc task manager, SIGTERM kill, Refresh |
 
 ### luna-shell, luna-bar, luna-island
 
-**Status:** ⬜ NOT STARTED
-**Completion:** 0%
+**Status:** 🔵 IN PROGRESS
+**Completion:** ~25% (luna-desktop implemented as skeleton)
 **Estimated Complexity:** High
 **Notes:** luna-island owns the conversation panel (DL-044). Three states: AMBIENT, COMPACT_PANEL, FULL_CONVERSATION.
-
----
 
 ## Phase 3: AI & Shell Integration — NOT STARTED
 
