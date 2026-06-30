@@ -33,16 +33,13 @@ static bool lgp_surface_type_known(uint32_t surface_type) {
 }
 
 static bool lgp_surface_is_in_display(const lgp_surface_create_payload_t *payload,
-                                      uint32_t display_width,
-                                      uint32_t display_height) {
+                                      uint32_t display_width __attribute__((unused)),
+                                      uint32_t display_height __attribute__((unused))) {
     if (payload->width == 0 || payload->height == 0) return false;
-    if (payload->width > display_width || payload->height > display_height) {
-        return false;
-    }
-    uint32_t x = payload->x < 0 ? 0 : (uint32_t)payload->x;
-    uint32_t y = payload->y < 0 ? 0 : (uint32_t)payload->y;
-    return x <= display_width - payload->width &&
-           y <= display_height - payload->height;
+    if (payload->width > 4096 || payload->height > 4096) return false;
+    if (payload->x < -4096 || payload->x > 4096) return false;
+    if (payload->y < -4096 || payload->y > 4096) return false;
+    return true;
 }
 
 static bool lgp_surface_client_has_cap(const lgp_client_t *client, uint32_t cap) {
@@ -300,17 +297,35 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                 continue;
             }
 
-            for (uint32_t row_idx = 0; row_idx < surface->height; row_idx++) {
+            int x_start = surface->x;
+            int y_start = surface->y;
+            int x_end = surface->x + (int)surface->width;
+            int y_end = surface->y + (int)surface->height;
+
+            int clip_x1 = x_start < 0 ? 0 : x_start;
+            int clip_y1 = y_start < 0 ? 0 : y_start;
+            int clip_x2 = x_end > (int)dst_width ? (int)dst_width : x_end;
+            int clip_y2 = y_end > (int)dst_height ? (int)dst_height : y_end;
+
+            if (clip_x1 >= clip_x2 || clip_y1 >= clip_y2) {
+                continue;
+            }
+
+            uint32_t copy_w = (uint32_t)(clip_x2 - clip_x1);
+            int sx = clip_x1 - x_start;
+
+            for (int dy = clip_y1; dy < clip_y2; dy++) {
+                int sy = dy - y_start;
                 const uint8_t *src_row = (const uint8_t *)surface->buffer_map +
-                                         ((size_t)row_idx * surface->stride);
+                                         ((size_t)sy * surface->stride);
                 uint8_t *dst_row = (uint8_t *)dst +
-                                   ((size_t)((uint32_t)surface->y + row_idx) * dst_pitch) +
-                                   ((size_t)(uint32_t)surface->x * LGP_BYTES_PER_PIXEL_XRGB8888);
+                                   ((size_t)dy * dst_pitch) +
+                                   ((size_t)clip_x1 * LGP_BYTES_PER_PIXEL_XRGB8888);
                 
                 if (surface->pixel_format == LGP_PIXEL_FORMAT_ARGB8888) {
-                    for (uint32_t px = 0; px < surface->width; px++) {
+                    for (uint32_t px = 0; px < copy_w; px++) {
                         uint32_t src_px;
-                        memcpy(&src_px, src_row + (size_t)px * 4, 4);
+                        memcpy(&src_px, src_row + (size_t)(sx + px) * 4, 4);
                         uint32_t alpha = src_px >> 24;
                         
                         if (alpha == 255) {
@@ -336,7 +351,8 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                         }
                     }
                 } else if (surface->pixel_format == LGP_PIXEL_FORMAT_XRGB8888) {
-                    memcpy(dst_row, src_row, (size_t)surface->width * LGP_BYTES_PER_PIXEL_XRGB8888);
+                    memcpy(dst_row, src_row + (size_t)sx * LGP_BYTES_PER_PIXEL_XRGB8888, 
+                           (size_t)copy_w * LGP_BYTES_PER_PIXEL_XRGB8888);
                 }
             }
         }
