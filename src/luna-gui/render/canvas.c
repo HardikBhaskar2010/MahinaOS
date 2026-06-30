@@ -63,9 +63,9 @@ void lgui_canvas_fill_rect(lgui_canvas_t *canvas, int x, int y, int w, int h, ui
     if (nw <= 0 || nh <= 0) return;
     
     for (int p_y = ny; p_y < ny + nh; p_y++) {
-        uint32_t *row = (uint32_t *)((uint8_t *)canvas->pixels + p_y * canvas->stride);
+        uint8_t *row = (uint8_t *)canvas->pixels + p_y * canvas->stride;
         for (int p_x = nx; p_x < nx + nw; p_x++) {
-            row[p_x] = color;
+            memcpy(row + p_x * 4, &color, 4);
         }
     }
 }
