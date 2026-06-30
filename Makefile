@@ -14,6 +14,12 @@
 #   make test-fuzz        — Run TOML fuzz regression (5 seconds)
 #   make lint             — Run clang-tidy on all sources
 
+# Probe for libdrm (required by lgp-compositor)
+LIBDRM_HEADERS_EXIST := $(shell if [ -f /usr/include/libdrm/xf86drm.h ] || [ -f /usr/include/xf86drm.h ] || pkg-config --exists libdrm 2>/dev/null; then echo "yes"; else echo "no"; fi)
+ifeq ($(LIBDRM_HEADERS_EXIST),no)
+  $(warning "WARNING: libdrm headers not found. Building lgp-compositor will fail. Please install libdrm-dev or equivalent.")
+endif
+
 # ---------------------------------------------------------------------------
 # Toolchain
 # ---------------------------------------------------------------------------
@@ -210,11 +216,11 @@ $(BUILD_DIR)/luna-init/%.o: $(LUNA_INIT_SRC)/%.c | $(BUILD_DIR)/luna-init
 
 $(BUILD_DIR)/luna-init-ctl/luna-init-ctl: $(LUNA_CTL_OBJECTS) | $(BUILD_DIR)/luna-init-ctl
 	@echo "  LINK    $@"
-	$(CC) $(CFLAGS_STATIC) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 $(BUILD_DIR)/luna-init-ctl/%.o: $(LUNA_CTL_SRC)/%.c | $(BUILD_DIR)/luna-init-ctl
 	@echo "  CC      $<"
-	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -c -o $@ $<
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 # ---------------------------------------------------------------------------
 # luna-splash binary (statically linked for early boot)

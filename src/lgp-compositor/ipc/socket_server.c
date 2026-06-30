@@ -51,13 +51,14 @@ int lgp_socket_server_init(void) {
         return -1;
     }
 
-    /* Set permissions to 0660 (rw-rw----) and ownership to root:video */
-    chmod(LGP_SOCKET_PATH, 0660);
+    /* Set permissions and ownership */
     struct group *gr = getgrnam("video");
     if (gr) {
+        chmod(LGP_SOCKET_PATH, 0660);
         chown(LGP_SOCKET_PATH, 0, gr->gr_gid);
     } else {
-        LGP_WARN("ipc", "Group 'video' not found, socket may not be accessible to clients");
+        LGP_WARN("ipc", "Group 'video' not found (NSS fallback) — relaxing socket permissions to 0666");
+        chmod(LGP_SOCKET_PATH, 0666);
     }
 
     LGP_INFO("ipc", "Listening for LGP connections on %s", LGP_SOCKET_PATH);

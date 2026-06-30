@@ -42,6 +42,7 @@
 #define LGP_MSG_WM_SET_FOCUS         0x0203
 #define LGP_MSG_WM_SET_STATE         0x0204
 #define LGP_MSG_WM_GRAB_KEY          0x0205
+#define LGP_MSG_OUTPUT_GEOMETRY      0x0300
 #define LGP_MSG_ERROR       0xFFFF
 
 typedef struct {

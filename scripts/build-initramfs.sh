@@ -39,6 +39,51 @@ for cmd in sh ls mount umount cat echo mkdir rm cp mv dmesg modprobe; do
     ln -s /bin/busybox "${INITRAMFS_DIR}/bin/${cmd}"
 done
 
+echo "  INITRAMFS Installing additional userland binaries..."
+mkdir -p "${INITRAMFS_DIR}/usr/bin"
+mkdir -p "${INITRAMFS_DIR}/etc/luna/services"
+
+# List of binaries to copy
+binaries=(
+    "lgp-compositor/lgp-compositor"
+    "luna-shell/luna-shell"
+    "luna-desktop/luna-desktop"
+    "luna-terminal/luna-terminal"
+    "luna-settings/luna-settings"
+    "luna-files/luna-files"
+    "luna-calc/luna-calc"
+    "luna-installer/luna-installer"
+    "luna-tasks/luna-tasks"
+    "luna-about/luna-about"
+    "luna-text/luna-text"
+    "luna-init-ctl/luna-init-ctl"
+    "luna-splash/luna-splash"
+)
+
+for b in "${binaries[@]}"; do
+    name=$(basename "$b")
+    src="${BUILD_DIR}/${b}"
+    if [ -f "${src}" ]; then
+        cp "${src}" "${INITRAMFS_DIR}/usr/bin/"
+        chmod +x "${INITRAMFS_DIR}/usr/bin/${name}"
+    else
+        echo "WARNING: Binary ${name} not found at ${src}. Skipping."
+    fi
+done
+
+# Copy service descriptors
+if [ -d "$(pwd)/etc/luna/services" ]; then
+    cp -r "$(pwd)/etc/luna/services/"* "${INITRAMFS_DIR}/etc/luna/services/"
+else
+    echo "WARNING: etc/luna/services not found. Skipping."
+fi
+
+# Create basic passwd/group files inside initramfs
+mkdir -p "${INITRAMFS_DIR}/etc"
+echo "root:x:0:0:root:/root:/bin/sh" > "${INITRAMFS_DIR}/etc/passwd"
+echo "root:x:0:" > "${INITRAMFS_DIR}/etc/group"
+echo "video:x:44:" >> "${INITRAMFS_DIR}/etc/group"
+
 echo "  INITRAMFS Installing kernel modules..."
 mkdir -p "${INITRAMFS_DIR}/lib/modules"
 if [ -d "${BUILD_DIR}/kernel/lib/modules" ]; then

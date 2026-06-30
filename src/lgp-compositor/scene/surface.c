@@ -8,6 +8,68 @@
 #include "surface.h"
 #include "../logging/log.h"
 #include "../protocol/caps.h"
+#include "../protocol/wm.h"
+
+static struct {
+    int32_t x;
+    int32_t y;
+    uint32_t screen_width;
+    uint32_t screen_height;
+} g_cursor = {0};
+
+void lgp_cursor_init(uint32_t screen_w, uint32_t screen_h) {
+    g_cursor.screen_width = screen_w;
+    g_cursor.screen_height = screen_h;
+    g_cursor.x = (int32_t)screen_w / 2;
+    g_cursor.y = (int32_t)screen_h / 2;
+}
+
+void lgp_cursor_set_position(int32_t x, int32_t y) {
+    g_cursor.x = x;
+    g_cursor.y = y;
+    if (g_cursor.x < 0) g_cursor.x = 0;
+    if (g_cursor.x >= (int32_t)g_cursor.screen_width) g_cursor.x = (int32_t)g_cursor.screen_width - 1;
+    if (g_cursor.y < 0) g_cursor.y = 0;
+    if (g_cursor.y >= (int32_t)g_cursor.screen_height) g_cursor.y = (int32_t)g_cursor.screen_height - 1;
+}
+
+static void draw_software_cursor(void *dst, uint32_t dst_width, uint32_t dst_height, uint32_t dst_pitch) {
+    static const uint8_t cursor_bitmap[12][8] = {
+        {1, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 0, 0},
+        {1, 2, 1, 0, 0, 0, 0, 0},
+        {1, 2, 2, 1, 0, 0, 0, 0},
+        {1, 2, 2, 2, 1, 0, 0, 0},
+        {1, 2, 2, 2, 2, 1, 0, 0},
+        {1, 2, 2, 2, 2, 2, 1, 0},
+        {1, 2, 2, 1, 1, 1, 1, 1},
+        {1, 2, 1, 1, 0, 0, 0, 0},
+        {1, 1, 0, 1, 1, 0, 0, 0},
+        {1, 0, 0, 0, 1, 1, 0, 0},
+        {0, 0, 0, 0, 0, 1, 1, 0}
+    };
+
+    int32_t cx = g_cursor.x;
+    int32_t cy = g_cursor.y;
+
+    for (int y = 0; y < 12; y++) {
+        int32_t dest_y = cy + y;
+        if (dest_y < 0 || dest_y >= (int32_t)dst_height) continue;
+
+        uint8_t *row = (uint8_t *)dst + ((size_t)dest_y * dst_pitch);
+        for (int x = 0; x < 8; x++) {
+            int32_t dest_x = cx + x;
+            if (dest_x < 0 || dest_x >= (int32_t)dst_width) continue;
+
+            uint8_t val = cursor_bitmap[y][x];
+            if (val == 0) continue;
+
+            uint32_t color = (val == 1) ? 0x00000000U : 0x00FFFFFFU;
+            memcpy(row + ((size_t)dest_x * 4), &color, 4);
+        }
+    }
+}
+
 
 #include <errno.h>
 #include <limits.h>
@@ -296,67 +358,72 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
             if (!surface->in_use || surface->layer != layer || !surface->buffer_map) {
                 continue;
             }
-
-            int x_start = surface->x;
-            int y_start = surface->y;
-            int x_end = surface->x + (int)surface->width;
-            int y_end = surface->y + (int)surface->height;
-
-            int clip_x1 = x_start < 0 ? 0 : x_start;
-            int clip_y1 = y_start < 0 ? 0 : y_start;
-            int clip_x2 = x_end > (int)dst_width ? (int)dst_width : x_end;
-            int clip_y2 = y_end > (int)dst_height ? (int)dst_height : y_end;
-
-            if (clip_x1 >= clip_x2 || clip_y1 >= clip_y2) {
+            if (surface->wm_state == LGP_WM_STATE_MINIMIZED || surface->wm_state == LGP_WM_STATE_HIDDEN) {
                 continue;
             }
 
-            uint32_t copy_w = (uint32_t)(clip_x2 - clip_x1);
-            int sx = clip_x1 - x_start;
+            int32_t x_start = surface->x;
+            int32_t y_start = surface->y;
+            int32_t x_end = surface->x + (int32_t)surface->width;
+            int32_t y_end = surface->y + (int32_t)surface->height;
 
-            for (int dy = clip_y1; dy < clip_y2; dy++) {
-                int sy = dy - y_start;
+            int32_t clip_x_start = x_start < 0 ? 0 : x_start;
+            int32_t clip_y_start = y_start < 0 ? 0 : y_start;
+            int32_t clip_x_end = x_end > (int32_t)dst_width ? (int32_t)dst_width : x_end;
+            int32_t clip_y_end = y_end > (int32_t)dst_height ? (int32_t)dst_height : y_end;
+
+            if (clip_x_start >= clip_x_end || clip_y_start >= clip_y_end) {
+                continue; // Fully offscreen / clipped out
+            }
+
+            for (int32_t y = clip_y_start; y < clip_y_end; y++) {
+                int32_t src_y = y - y_start;
                 const uint8_t *src_row = (const uint8_t *)surface->buffer_map +
-                                         ((size_t)sy * surface->stride);
-                uint8_t *dst_row = (uint8_t *)dst +
-                                   ((size_t)dy * dst_pitch) +
-                                   ((size_t)clip_x1 * LGP_BYTES_PER_PIXEL_XRGB8888);
-                
+                                         ((size_t)src_y * surface->stride);
+                uint8_t *dst_row = (uint8_t *)dst + ((size_t)y * dst_pitch);
+
+                int32_t copy_width = clip_x_end - clip_x_start;
+
                 if (surface->pixel_format == LGP_PIXEL_FORMAT_ARGB8888) {
-                    for (uint32_t px = 0; px < copy_w; px++) {
+                    for (int32_t dx = clip_x_start; dx < clip_x_end; dx++) {
+                        int32_t sx = dx - x_start;
                         uint32_t src_px;
-                        memcpy(&src_px, src_row + (size_t)(sx + px) * 4, 4);
+                        memcpy(&src_px, src_row + (size_t)sx * 4, 4);
                         uint32_t alpha = src_px >> 24;
-                        
+
                         if (alpha == 255) {
-                            memcpy(dst_row + (size_t)px * 4, &src_px, 4);
+                            memcpy(dst_row + (size_t)dx * 4, &src_px, 4);
                         } else if (alpha > 0) {
                             uint32_t d_px;
-                            memcpy(&d_px, dst_row + (size_t)px * 4, 4);
-                            
+                            memcpy(&d_px, dst_row + (size_t)dx * 4, 4);
+
                             uint32_t s_r = (src_px >> 16) & 0xFF;
                             uint32_t s_g = (src_px >> 8) & 0xFF;
                             uint32_t s_b = src_px & 0xFF;
                             uint32_t d_r = (d_px >> 16) & 0xFF;
                             uint32_t d_g = (d_px >> 8) & 0xFF;
                             uint32_t d_b = d_px & 0xFF;
-                            
+
                             uint32_t inv_alpha = 255 - alpha;
                             uint32_t r = (s_r * alpha + d_r * inv_alpha) / 255;
                             uint32_t g = (s_g * alpha + d_g * inv_alpha) / 255;
                             uint32_t b = (s_b * alpha + d_b * inv_alpha) / 255;
-                            
+
                             uint32_t out_px = (r << 16) | (g << 8) | b;
-                            memcpy(dst_row + (size_t)px * 4, &out_px, 4);
+                            memcpy(dst_row + (size_t)dx * 4, &out_px, 4);
                         }
                     }
                 } else if (surface->pixel_format == LGP_PIXEL_FORMAT_XRGB8888) {
-                    memcpy(dst_row, src_row + (size_t)sx * LGP_BYTES_PER_PIXEL_XRGB8888, 
-                           (size_t)copy_w * LGP_BYTES_PER_PIXEL_XRGB8888);
+                    int32_t sx_start = clip_x_start - x_start;
+                    memcpy(dst_row + (size_t)clip_x_start * 4,
+                           src_row + (size_t)sx_start * 4,
+                           (size_t)copy_width * 4);
                 }
             }
         }
     }
+
+    draw_software_cursor(dst, dst_width, dst_height, dst_pitch);
 
     return 0;
 }

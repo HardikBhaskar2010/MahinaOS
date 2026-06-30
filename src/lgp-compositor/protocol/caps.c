@@ -17,6 +17,9 @@ uint32_t lgp_caps_negotiate(lgp_client_t *client, uint32_t requested_caps) {
     if (requested_caps & LGP_CAP_DIRECT_LGP) {
         granted |= LGP_CAP_DIRECT_LGP;
     }
+    if (requested_caps & LGP_CAP_CLIPBOARD) {
+        granted |= LGP_CAP_CLIPBOARD;
+    }
 
     /* Privileged compositor layers are still restricted to trusted system clients. */
     if (client->uid == 0) {
@@ -31,7 +34,7 @@ uint32_t lgp_caps_negotiate(lgp_client_t *client, uint32_t requested_caps) {
         }
     }
 
-    /* DMA-BUF, cursor shape, and clipboard are not implemented yet, so deny them. */
+    /* DMA-BUF and cursor shape are not implemented yet, so deny them. */
 
     if (requested_caps != granted) {
         LGP_WARN("protocol", "Client (pid %d) requested caps 0x%08x, but granted 0x%08x",
