@@ -21,6 +21,7 @@
 
 #include "lunagui.h"
 #include "widget_private.h"
+#include "lgui_private.h"
 
 /* ── Mahina Design System Color Palette ────────────────────────────────────── */
 
