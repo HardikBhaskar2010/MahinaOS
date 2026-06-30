@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+int pty_spawn(pid_t *out_pid, int *out_fd);
+
 int pty_spawn(pid_t *out_pid, int *out_fd) {
     int master_fd = -1;
     pid_t pid = forkpty(&master_fd, NULL, NULL, NULL);
