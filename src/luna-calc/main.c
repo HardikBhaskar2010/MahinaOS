@@ -40,7 +40,6 @@ static lgui_widget_t      *g_display = NULL;  /* Label showing current input */
 
 static char   g_display_text[128] = "0";
 static double g_accumulator = 0.0;
-static double g_operand     = 0.0;
 static char   g_pending_op  = 0;
 static bool   g_new_input   = true;
 
