@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <signal.h>
 
 /* ── Terminal configuration ──────────────────────────────────────────────── */
 
@@ -80,14 +81,9 @@ static void terminal_render_cb(lgui_widget_t *widget, lgui_canvas_t *canvas, int
             int cell_x = x + TERM_PAD + c * TERM_FONT_W;
             int cell_y = y + TERM_PAD + r * TERM_FONT_H;
 
-            /* Default colors */
-            uint32_t bg = 0xFF1E1E28u; /* MAHINA_BG_SURFACE */
-            uint32_t fg = 0xFFEEEEF4u; /* MAHINA_TEXT_PRIMARY */
-            
-            /* TODO: parse cell.fg and cell.bg ANSI colors if needed */
-            if (cell.flags & TERM_CELL_INVERSE) {
-                uint32_t tmp = bg; bg = fg; fg = tmp;
-            }
+            /* Use cell.fg and cell.bg ANSI colors directly */
+            uint32_t bg = cell.bg;
+            uint32_t fg = cell.fg;
 
             /* Draw background */
             if (bg != 0xFF1E1E28u) {
@@ -105,8 +101,7 @@ static void terminal_render_cb(lgui_widget_t *widget, lgui_canvas_t *canvas, int
 
 static void render_grid(void) {
     if (g_win) {
-        g_win->dirty = true;
-        /* Trigger a re-render in the event loop */
+        lgui_window_update(g_win);
     }
 }
 

@@ -50,7 +50,7 @@ static void update_display(void) {
     if (g_display) {
         lgui_label_set_text(g_display, g_display_text);
         /* Mark window dirty for re-render */
-        if (g_win) g_win->dirty = true;
+        if (g_win) lgui_window_update(g_win);
     }
 }
 

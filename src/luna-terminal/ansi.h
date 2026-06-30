@@ -48,7 +48,7 @@ static const uint32_t ANSI_COLORS[16] = {
     0xFFCCBB33u, /* 3: Yellow      */
     0xFF4488CCu, /* 4: Blue        */
     0xFFAA44AAu, /* 5: Magenta     */
-    0xFF44AACC u, /* 6: Cyan       */
+    0xFF44AACCu, /* 6: Cyan       */
     0xFFBBBBCCu, /* 7: White       */
     /* Bright variants */
     0xFF555566u, /* 8:  Bright Black   */
