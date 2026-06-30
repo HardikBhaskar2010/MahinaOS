@@ -162,7 +162,7 @@ LGP_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint help
 
-all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-desktop luna-installer luna-terminal luna-settings luna-files
+all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-desktop luna-installer luna-terminal luna-settings luna-files luna-calc luna-text luna-about luna-tasks
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -425,3 +425,23 @@ include src/luna-settings/Makefile.inc
 # luna-files
 # ---------------------------------------------------------------------------
 include src/luna-files/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-calc
+# ---------------------------------------------------------------------------
+include src/luna-calc/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-text
+# ---------------------------------------------------------------------------
+include src/luna-text/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-about
+# ---------------------------------------------------------------------------
+include src/luna-about/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-tasks
+# ---------------------------------------------------------------------------
+include src/luna-tasks/Makefile.inc
