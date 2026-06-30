@@ -10,6 +10,8 @@
 #include "../protocol/caps.h"
 #include "../protocol/wm.h"
 
+#include <string.h>
+
 static struct {
     int32_t x;
     int32_t y;

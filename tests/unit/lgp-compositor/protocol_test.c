@@ -138,6 +138,9 @@ void test_surface_denies_privileged_surface_without_cap(void) {
 
 void test_commit_shm_and_composite(void);
 void test_commit_shm_and_composite(void) {
+    lgp_cursor_init(32, 32);
+    lgp_cursor_set_position(30, 30);
+
     lgp_surface_manager_t manager;
     lgp_surface_manager_init(&manager);
 
