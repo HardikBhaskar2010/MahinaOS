@@ -28,7 +28,7 @@ static bool depgraph_has_cycle(void) {
     int queue[SERVICE_MAX_COUNT];
     int q_head = 0;
     int q_tail = 0;
-    int indegree[SERVICE_MAX_COUNT];
+    int indegree[SERVICE_MAX_COUNT] = {0};
     int out_count = 0;
 
     for (int i = 0; i < g_service_count; i++) {

@@ -84,8 +84,6 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
         case READY_SIGNAL:
             /* Stubbed — signal readiness requires tracking per-service SIGUSR1.
              * Treated as READY_NONE for v0.1. */
-            return true;
-
         default:
             return true;
     }
