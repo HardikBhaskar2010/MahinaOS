@@ -508,6 +508,7 @@ static bool lgp_handle_wm_set_focus(lgp_compositor_state_t *state, lgp_client_t 
 }
 
 static bool lgp_handle_wm_set_state(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg) {
+    (void)state;
     if (!(client->caps_granted & LGP_CAP_WINDOW_MANAGER)) return false;
     lgp_wm_set_state_payload_t payload;
     if (!lgp_wm_decode_set_state(msg, &payload)) return false;
