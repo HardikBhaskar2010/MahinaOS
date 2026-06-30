@@ -47,11 +47,17 @@ static void launch_terminal(void) {
 }
 
 static void render_wallpaper(lgui_widget_t *widget, lgui_canvas_t *canvas, int ox, int oy) {
+    (void)widget;
+    (void)ox;
+    (void)oy;
     /* Draw a simple gradient or solid color */
     lgui_canvas_fill_rect(canvas, 0, 0, 1024, 768, 0xFF2A2A35); /* Dark blue/grey */
 }
 
 static void on_surface_created(uint32_t surface_id, uint32_t type, uint32_t w, uint32_t h, void *user_data) {
+    (void)w;
+    (void)h;
+    (void)user_data;
     if (type != 4) return; /* LGP_SURFACE_APPLICATION_WINDOW */
     
     if (shell.surface_count < MAX_SURFACES) {
@@ -77,6 +83,7 @@ static void on_surface_created(uint32_t surface_id, uint32_t type, uint32_t w, u
 }
 
 static void on_surface_destroyed(uint32_t surface_id, void *user_data) {
+    (void)user_data;
     for (size_t i = 0; i < shell.surface_count; i++) {
         if (shell.surfaces[i].id == surface_id) {
             /* Remove by swapping with last */
@@ -88,6 +95,7 @@ static void on_surface_destroyed(uint32_t surface_id, void *user_data) {
 }
 
 static void on_global_key(uint32_t key, uint32_t modifiers, void *user_data) {
+    (void)user_data;
     if (key == KEY_T && (modifiers & LGP_MOD_SUPER)) {
         printf("luna-shell: Launching terminal\n");
         launch_terminal();
@@ -108,6 +116,8 @@ static void on_global_key(uint32_t key, uint32_t modifiers, void *user_data) {
 }
 
 int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
     printf("Starting luna-shell...\n");
     
     memset(&shell, 0, sizeof(shell));

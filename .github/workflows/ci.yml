@@ -110,3 +110,24 @@ jobs:
 
       - name: Run fuzz regression
         run: make test-fuzz CC=clang
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gate 5: QEMU Boot Smoke Test — Boot verification loop
+  # ─────────────────────────────────────────────────────────────────────────
+  boot-test:
+    name: "Gate 5 — QEMU Boot Smoke Test"
+    runs-on: ubuntu-24.04
+    needs: [build, unit-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain and dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang lld llvm make qemu-system-x86 ovmf parted dosfstools btrfs-progs bzip2
+
+      - name: Run verification boot test
+        run: |
+          sudo modprobe loop || true
+          make verify CC=clang
