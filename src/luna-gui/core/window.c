@@ -182,7 +182,10 @@ lgui_window_t *lgui_window_create(lgui_application_t *app,
     snprintf(memfd_name, sizeof(memfd_name), "lunagui_win_%u", layer);
 
     win->buffer_size = (size_t)width * height * 4u;
-    win->buffer_fd   = memfd_create(memfd_name, MFD_CLOEXEC);
+#ifndef MFD_NOEXEC_SEAL
+#define MFD_NOEXEC_SEAL 0x0008U
+#endif
+    win->buffer_fd   = memfd_create(memfd_name, MFD_CLOEXEC | MFD_NOEXEC_SEAL);
     if (win->buffer_fd < 0) {
         free(win);
         return NULL;

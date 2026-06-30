@@ -398,7 +398,7 @@ static bool lgp_handle_create_surface(lgp_compositor_state_t *state,
 
     LGP_INFO("surface", "Client session=%u created surface id=%u", client->session_id, surface_id);
     
-    if (state->wm_client) {
+    if (state->wm_client && state->wm_client != client) {
         uint8_t buf[64];
         if (lgp_wm_encode_surface_created(buf, sizeof(buf), surface_id, payload.surface_type, payload.width, payload.height)) {
             lgp_write_all(state->wm_client->fd, buf, LGP_HEADER_SIZE + 16);
@@ -424,7 +424,7 @@ static bool lgp_handle_destroy_surface(lgp_compositor_state_t *state,
         return false;
     }
 
-    if (state->wm_client) {
+    if (state->wm_client && state->wm_client != client) {
         uint8_t buf[32];
         if (lgp_wm_encode_surface_destroyed(buf, sizeof(buf), payload.surface_id)) {
             lgp_write_all(state->wm_client->fd, buf, LGP_HEADER_SIZE + 4);
@@ -444,7 +444,8 @@ static bool lgp_repaint_surfaces(lgp_compositor_state_t *state, drm_device_t *dr
         return false;
     }
 
-    if (kms_page_flip(drm_dev, drm_dev->front_buffer, NULL) != 0) {
+    int flip_res = kms_page_flip(drm_dev, drm_dev->front_buffer, NULL);
+    if (flip_res != 0 && flip_res != -EBUSY) {
         LGP_WARN("surface", "Surface scene page flip failed");
         return false;
     }

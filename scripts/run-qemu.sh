@@ -47,6 +47,8 @@ qemu-system-x86_64 \
     -drive file="$IMG_FILE",format=raw,if=virtio \
     -netdev user,id=net0 \
     -device virtio-net-pci,netdev=net0 \
-    -vga virtio \
+    -device virtio-vga,xres=1024,yres=768 \
+    -device virtio-mouse-pci \
+    -device virtio-keyboard-pci \
     -display gtk \
     -serial mon:stdio

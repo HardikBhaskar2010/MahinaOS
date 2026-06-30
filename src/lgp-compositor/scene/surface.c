@@ -35,18 +35,12 @@ static bool lgp_surface_type_known(uint32_t surface_type) {
 static bool lgp_surface_is_in_display(const lgp_surface_create_payload_t *payload,
                                       uint32_t display_width,
                                       uint32_t display_height) {
-    if (payload->width == 0 || payload->height == 0) {
-        return false;
-    }
-    if (payload->x < 0 || payload->y < 0) {
-        return false;
-    }
+    if (payload->width == 0 || payload->height == 0) return false;
     if (payload->width > display_width || payload->height > display_height) {
         return false;
     }
-
-    uint32_t x = (uint32_t)payload->x;
-    uint32_t y = (uint32_t)payload->y;
+    uint32_t x = payload->x < 0 ? 0 : (uint32_t)payload->x;
+    uint32_t y = payload->y < 0 ? 0 : (uint32_t)payload->y;
     return x <= display_width - payload->width &&
            y <= display_height - payload->height;
 }
@@ -60,39 +54,52 @@ static uint32_t lgp_surface_validate_request(const lgp_client_t *client,
                                              uint32_t display_width,
                                              uint32_t display_height) {
     if (!client || !payload || !lgp_surface_type_known(payload->surface_type)) {
+        LGP_ERROR("surface", "Validate failed: client=%p, payload=%p, type=%u", (const void *)client, (const void *)payload, payload ? payload->surface_type : 0);
         return LGP_SURFACE_STATUS_INVALID;
     }
     if (!lgp_surface_is_in_display(payload, display_width, display_height)) {
+        LGP_ERROR("surface", "Validate failed: in_display failed. payload=%dx%d at %d,%d, display=%dx%d", payload->width, payload->height, payload->x, payload->y, display_width, display_height);
         return LGP_SURFACE_STATUS_INVALID;
     }
 
     switch (payload->surface_type) {
         case LGP_SURFACE_APPLICATION_WINDOW:
-            return payload->layer == LGP_LAYER_APPLICATION ?
-                   LGP_SURFACE_STATUS_OK : LGP_SURFACE_STATUS_INVALID;
+            if (payload->layer != LGP_LAYER_APPLICATION) {
+                LGP_ERROR("surface", "Validate failed: APP_WINDOW wrong layer %u", payload->layer);
+                return LGP_SURFACE_STATUS_INVALID;
+            }
+            return LGP_SURFACE_STATUS_OK;
         case LGP_SURFACE_CANVAS_SURFACE:
             if (!lgp_surface_client_has_cap(client, LGP_CAP_CANVAS_SURFACE)) {
                 return LGP_SURFACE_STATUS_DENIED;
             }
-            return (payload->layer == LGP_LAYER_APPLICATION ||
-                    payload->layer == LGP_LAYER_WALLPAPER) ?
-                   LGP_SURFACE_STATUS_OK : LGP_SURFACE_STATUS_INVALID;
+            if (payload->layer != LGP_LAYER_APPLICATION && payload->layer != LGP_LAYER_WALLPAPER) {
+                LGP_ERROR("surface", "Validate failed: CANVAS wrong layer %u", payload->layer);
+                return LGP_SURFACE_STATUS_INVALID;
+            }
+            return LGP_SURFACE_STATUS_OK;
         case LGP_SURFACE_LUNA_ISLAND:
             if (!lgp_surface_client_has_cap(client, LGP_CAP_LUNA_ISLAND)) {
                 return LGP_SURFACE_STATUS_DENIED;
             }
-            return payload->layer == LGP_LAYER_LUNA_ISLAND ?
-                   LGP_SURFACE_STATUS_OK : LGP_SURFACE_STATUS_INVALID;
+            if (payload->layer != LGP_LAYER_LUNA_ISLAND) {
+                LGP_ERROR("surface", "Validate failed: ISLAND wrong layer %u", payload->layer);
+                return LGP_SURFACE_STATUS_INVALID;
+            }
+            return LGP_SURFACE_STATUS_OK;
         case LGP_SURFACE_SYSTEM_CHROME:
         case LGP_SURFACE_SHELL_SURFACE:
         case LGP_SURFACE_OVERLAY_SURFACE:
             if (!lgp_surface_client_has_cap(client, LGP_CAP_LAYER_SHELL)) {
                 return LGP_SURFACE_STATUS_DENIED;
             }
-            return payload->layer >= LGP_LAYER_SHELL &&
-                   payload->layer <= LGP_LAYER_SYSTEM_MODAL ?
-                   LGP_SURFACE_STATUS_OK : LGP_SURFACE_STATUS_INVALID;
+            if (payload->layer < LGP_LAYER_SHELL || payload->layer > LGP_LAYER_SYSTEM_MODAL) {
+                LGP_ERROR("surface", "Validate failed: SHELL wrong layer %u", payload->layer);
+                return LGP_SURFACE_STATUS_INVALID;
+            }
+            return LGP_SURFACE_STATUS_OK;
         default:
+            LGP_ERROR("surface", "Validate failed: unknown type switch %u", payload->surface_type);
             return LGP_SURFACE_STATUS_INVALID;
     }
 }
