@@ -34,6 +34,9 @@ void lgp_mouse_init(uint32_t screen_width, uint32_t screen_height) {
     g_mouse_x  = g_screen_w / 2;
     g_mouse_y  = g_screen_h / 2;
 
+    lgp_cursor_init(screen_width, screen_height);
+    lgp_cursor_set_position(g_mouse_x, g_mouse_y);
+
     g_mouse_fd = open("/dev/input/mice", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
     if (g_mouse_fd < 0) {
         LGP_WARN("input", "Could not open /dev/input/mice — mouse input unavailable");
@@ -64,6 +67,9 @@ void lgp_mouse_pump(lgp_compositor_state_t *state) {
         if (g_mouse_x >= g_screen_w)  g_mouse_x = g_screen_w - 1;
         if (g_mouse_y < 0)            g_mouse_y = 0;
         if (g_mouse_y >= g_screen_h)  g_mouse_y = g_screen_h - 1;
+
+        /* Update software cursor position */
+        lgp_cursor_set_position(g_mouse_x, g_mouse_y);
 
         /* Dispatch motion event to the surface under the cursor */
         lgp_dispatch_pointer_motion(state, g_mouse_x, g_mouse_y);

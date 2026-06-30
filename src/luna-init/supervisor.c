@@ -29,6 +29,7 @@
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #define COMP "supervisor"
 
@@ -91,6 +92,32 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
 
 /* ─── Service spawning ───────────────────────────────────────────────────── */
 
+static uid_t parse_uid(const char *name_or_id) {
+    char *endptr = NULL;
+    long val = strtol(name_or_id, &endptr, 10);
+    if (endptr != name_or_id && *endptr == '\0') {
+        return (uid_t)val;
+    }
+    struct passwd *pw = getpwnam(name_or_id);
+    if (pw) {
+        return pw->pw_uid;
+    }
+    return (uid_t)-1;
+}
+
+static gid_t parse_gid(const char *name_or_id) {
+    char *endptr = NULL;
+    long val = strtol(name_or_id, &endptr, 10);
+    if (endptr != name_or_id && *endptr == '\0') {
+        return (gid_t)val;
+    }
+    struct group *gr = getgrnam(name_or_id);
+    if (gr) {
+        return gr->gr_gid;
+    }
+    return (gid_t)-1;
+}
+
 static pid_t spawn_service(service_t *svc) {
     /* Verify binary exists before forking */
     struct stat st = {0};
@@ -112,12 +139,12 @@ static pid_t spawn_service(service_t *svc) {
 
         /* Identity enforcement */
         if (svc->run_group[0] != '\0') {
-            struct group *gr = getgrnam(svc->run_group);
-            if (!gr) {
+            gid_t gid = parse_gid(svc->run_group);
+            if (gid == (gid_t)-1) {
                 LUNA_ERROR(COMP, "Service '%s': group '%s' not found", svc->name, svc->run_group);
                 _exit(127);
             }
-            if (setgid(gr->gr_gid) != 0) {
+            if (setgid(gid) != 0) {
                 LUNA_ERROR(COMP, "Service '%s': setgid() failed", svc->name);
                 _exit(127);
             }
@@ -132,12 +159,12 @@ static pid_t spawn_service(service_t *svc) {
         }
 
         if (svc->run_user[0] != '\0') {
-            struct passwd *pw = getpwnam(svc->run_user);
-            if (!pw) {
+            uid_t uid = parse_uid(svc->run_user);
+            if (uid == (uid_t)-1) {
                 LUNA_ERROR(COMP, "Service '%s': user '%s' not found", svc->name, svc->run_user);
                 _exit(127);
             }
-            if (setuid(pw->pw_uid) != 0) {
+            if (setuid(uid) != 0) {
                 LUNA_ERROR(COMP, "Service '%s': setuid() failed", svc->name);
                 _exit(127);
             }

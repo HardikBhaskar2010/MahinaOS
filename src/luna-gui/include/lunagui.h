@@ -171,9 +171,19 @@ lgui_application_t *lgui_application_create_wm(const char *name,
                                                void *user_data);
 
 void lgui_wm_set_surface_position(lgui_application_t *app, uint32_t surface_id, int x, int y);
-void lgui_wm_set_focus(lgui_application_t *app, uint32_t session_id);
+/*
+ * lgui_wm_set_focus() — Set the keyboard focus.
+ * Accepts a surface_id which the compositor resolves to its owning session_id.
+ */
+void lgui_wm_set_focus(lgui_application_t *app, uint32_t surface_id);
 void lgui_wm_set_state(lgui_application_t *app, uint32_t surface_id, uint32_t state);
 void lgui_wm_grab_key(lgui_application_t *app, uint32_t key, uint32_t modifiers);
+
+uint32_t lgui_output_width(lgui_application_t *app);
+uint32_t lgui_output_height(lgui_application_t *app);
+
+typedef void (*lgui_output_geometry_cb)(uint32_t width, uint32_t height, void *user_data);
+void lgui_application_set_output_geometry_cb(lgui_application_t *app, lgui_output_geometry_cb cb, void *user_data);
 
 /* ── Window extensions ────────────────────────────────────────────────────── */
 lgui_canvas_t *lgui_window_get_canvas(lgui_window_t *win);

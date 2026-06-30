@@ -50,8 +50,14 @@ static void render_wallpaper(lgui_widget_t *widget, lgui_canvas_t *canvas, int o
     (void)widget;
     (void)ox;
     (void)oy;
+    uint32_t w = lgui_output_width(shell.app);
+    uint32_t h = lgui_output_height(shell.app);
+    if (w == 0 || h == 0) {
+        w = 1024;
+        h = 768;
+    }
     /* Draw a simple gradient or solid color */
-    lgui_canvas_fill_rect(canvas, 0, 0, 1024, 768, 0xFF2A2A35); /* Dark blue/grey */
+    lgui_canvas_fill_rect(canvas, 0, 0, w, h, 0xFF2A2A35); /* Dark blue/grey */
 }
 
 static void on_surface_created(uint32_t surface_id, uint32_t type, uint32_t w, uint32_t h, void *user_data) {
@@ -137,14 +143,20 @@ int main(int argc, char **argv) {
     lgui_wm_grab_key(shell.app, KEY_TAB, LGP_MOD_ALT);
     
     /* Create Wallpaper */
-    shell.wallpaper = lgui_window_create(shell.app, 1024, 768, LGUI_LAYER_WALLPAPER);
+    uint32_t w = lgui_output_width(shell.app);
+    uint32_t h = lgui_output_height(shell.app);
+    if (w == 0 || h == 0) {
+        w = 1024;
+        h = 768;
+    }
+    shell.wallpaper = lgui_window_create(shell.app, w, h, LGUI_LAYER_WALLPAPER);
     lgui_widget_t *wp_canvas = lgui_canvas_widget_create();
     lgui_canvas_widget_set_render(wp_canvas, render_wallpaper);
     lgui_window_set_root_widget(shell.wallpaper, wp_canvas);
     lgui_window_show(shell.wallpaper);
     
     /* Create Top Bar */
-    shell.topbar = lgui_window_create(shell.app, 1024, 32, LGUI_LAYER_SHELL);
+    shell.topbar = lgui_window_create(shell.app, w, 32, LGUI_LAYER_SHELL);
     lgui_widget_t *hbox = lgui_hbox_create();
     lgui_widget_t *logo = lgui_label_create("  MahinaOS  ");
     lgui_widget_t *time = lgui_label_create(" 12:00 ");

@@ -38,7 +38,7 @@ typedef struct {
 } lgp_wm_set_position_payload_t;
 
 typedef struct {
-    uint32_t session_id;
+    uint32_t surface_id; /* Renamed from session_id: WM focus command uses surface id */
 } lgp_wm_set_focus_payload_t;
 
 typedef struct {

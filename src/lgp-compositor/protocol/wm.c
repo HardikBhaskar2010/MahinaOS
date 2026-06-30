@@ -49,7 +49,7 @@ bool lgp_wm_decode_set_position(const lgp_msg_t *msg, lgp_wm_set_position_payloa
 
 bool lgp_wm_decode_set_focus(const lgp_msg_t *msg, lgp_wm_set_focus_payload_t *out) {
     if (msg->type != LGP_MSG_WM_SET_FOCUS || msg->length < LGP_HEADER_SIZE + 4) return false;
-    out->session_id = read_u32_le(msg->payload + 0);
+    out->surface_id = read_u32_le(msg->payload + 0);
     return true;
 }
 

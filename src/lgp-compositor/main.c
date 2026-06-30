@@ -481,22 +481,28 @@ static bool lgp_handle_wm_set_position(lgp_compositor_state_t *state, lgp_client
     lgp_wm_set_position_payload_t payload;
     if (!lgp_wm_decode_set_position(msg, &payload)) return false;
 
+    // Find the surface
+    lgp_surface_t *surf = NULL;
+    for (size_t i = 0; i < LGP_SURFACE_MAX; i++) {
+        if (state->surface_manager.surfaces[i].in_use && state->surface_manager.surfaces[i].id == payload.surface_id) {
+            surf = &state->surface_manager.surfaces[i];
+            break;
+        }
+    }
+    if (!surf) return true;
+
     /* Validate bounds */
     int max_w = drm_dev ? (int)drm_dev->mode.hdisplay : 4096;
     int max_h = drm_dev ? (int)drm_dev->mode.vdisplay : 4096;
-    if (payload.x < -max_w || payload.x > max_w || payload.y < -max_h || payload.y > max_h) {
+    if (payload.x < -(int)surf->width || payload.x + (int)surf->width > max_w ||
+        payload.y < -(int)surf->height || payload.y + (int)surf->height > max_h) {
         LGP_WARN("wm", "WM rejected surface position (%d, %d) out of bounds", payload.x, payload.y);
         return false;
     }
 
-    for (size_t i = 0; i < LGP_SURFACE_MAX; i++) {
-        if (state->surface_manager.surfaces[i].in_use && state->surface_manager.surfaces[i].id == payload.surface_id) {
-            state->surface_manager.surfaces[i].x = payload.x;
-            state->surface_manager.surfaces[i].y = payload.y;
-            return lgp_repaint_surfaces(state, drm_dev);
-        }
-    }
-    return true;
+    surf->x = payload.x;
+    surf->y = payload.y;
+    return lgp_repaint_surfaces(state, drm_dev);
 }
 
 static bool lgp_handle_wm_set_focus(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg) {
@@ -504,17 +510,33 @@ static bool lgp_handle_wm_set_focus(lgp_compositor_state_t *state, lgp_client_t 
     lgp_wm_set_focus_payload_t payload;
     if (!lgp_wm_decode_set_focus(msg, &payload)) return false;
     
-    state->keyboard_focus_session_id = payload.session_id;
+    if (payload.surface_id == 0) {
+        state->keyboard_focus_session_id = 0;
+        state->keyboard_focus_surface_id = 0;
+    } else {
+        const lgp_surface_t *surf = lgp_surface_manager_find(&state->surface_manager, payload.surface_id);
+        if (surf) {
+            state->keyboard_focus_session_id = surf->owner_session_id;
+            state->keyboard_focus_surface_id = surf->id;
+        } else {
+            LGP_WARN("wm", "WM set focus to unknown surface_id %u", payload.surface_id);
+            return false;
+        }
+    }
     return true;
 }
 
 static bool lgp_handle_wm_set_state(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg) {
-    (void)state;
     if (!(client->caps_granted & LGP_CAP_WINDOW_MANAGER)) return false;
     lgp_wm_set_state_payload_t payload;
     if (!lgp_wm_decode_set_state(msg, &payload)) return false;
     
-    /* In v0.1, we just accept state changes, we might use them later for mapping/unmapping */
+    for (size_t i = 0; i < LGP_SURFACE_MAX; i++) {
+        if (state->surface_manager.surfaces[i].in_use && state->surface_manager.surfaces[i].id == payload.surface_id) {
+            state->surface_manager.surfaces[i].wm_state = payload.state;
+            break;
+        }
+    }
     return true;
 }
 
@@ -551,9 +573,25 @@ static bool lgp_handle_client_message(lgp_compositor_state_t *state,
 
     if (msg->type == LGP_MSG_HELLO) {
         bool ok = lgp_hello_handle(client, msg);
-        if (ok && (client->caps_granted & LGP_CAP_WINDOW_MANAGER)) { /* LGP_CAP_WINDOW_MANAGER */
-            state->wm_client = client;
-            LGP_INFO("ipc", "Client session=%u registered as Window Manager", client->session_id);
+        if (ok) {
+            if (client->caps_granted & LGP_CAP_WINDOW_MANAGER) {
+                state->wm_client = client;
+                LGP_INFO("ipc", "Client session=%u registered as Window Manager", client->session_id);
+            }
+            /* Send output geometry */
+            uint8_t geom[LGP_HEADER_SIZE + 8];
+            lgp_tlv_encode_header(geom, sizeof(geom), LGP_MSG_OUTPUT_GEOMETRY, sizeof(geom));
+            uint32_t w = drm_dev ? drm_dev->mode.hdisplay : 1024;
+            uint32_t h = drm_dev ? drm_dev->mode.vdisplay : 768;
+            geom[LGP_HEADER_SIZE + 0] = (uint8_t)(w & 0xFF);
+            geom[LGP_HEADER_SIZE + 1] = (uint8_t)((w >> 8) & 0xFF);
+            geom[LGP_HEADER_SIZE + 2] = (uint8_t)((w >> 16) & 0xFF);
+            geom[LGP_HEADER_SIZE + 3] = (uint8_t)((w >> 24) & 0xFF);
+            geom[LGP_HEADER_SIZE + 4] = (uint8_t)(h & 0xFF);
+            geom[LGP_HEADER_SIZE + 5] = (uint8_t)((h >> 8) & 0xFF);
+            geom[LGP_HEADER_SIZE + 6] = (uint8_t)((h >> 16) & 0xFF);
+            geom[LGP_HEADER_SIZE + 7] = (uint8_t)((h >> 24) & 0xFF);
+            lgp_write_all(client->fd, geom, sizeof(geom));
         }
         return ok;
     }

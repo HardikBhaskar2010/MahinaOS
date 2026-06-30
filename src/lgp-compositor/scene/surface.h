@@ -31,6 +31,7 @@ typedef struct {
     uint32_t pixel_format;
     size_t buffer_size;
     void *buffer_map;
+    uint32_t wm_state; /* LGP_WM_STATE_* */
 } lgp_surface_t;
 
 typedef struct {
@@ -61,5 +62,8 @@ int lgp_surface_manager_composite(const lgp_surface_manager_t *manager,
                                   uint32_t dst_pitch);
 const lgp_surface_t *lgp_surface_manager_find(const lgp_surface_manager_t *manager,
                                               uint32_t surface_id);
+
+void lgp_cursor_init(uint32_t screen_w, uint32_t screen_h);
+void lgp_cursor_set_position(int32_t x, int32_t y);
 
 #endif

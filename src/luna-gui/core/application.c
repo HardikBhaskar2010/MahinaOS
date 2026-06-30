@@ -214,13 +214,27 @@ lgui_application_t *lgui_application_create(const char *name) {
     /* Perform the LGP_HELLO handshake — mandatory before any other message */
     uint32_t caps_granted = 0;
     uint32_t caps_req = LGP_CAP_CANVAS_SURFACE | LGP_CAP_LAYER_SHELL | LGP_CAP_LUNA_ISLAND | LGP_CAP_CLIPBOARD;
-    if (!lgui_do_hello(fd, caps_req, &caps_granted)) { /* CANVAS_SURFACE | LAYER_SHELL | LUNA_ISLAND */
+    if (!lgui_do_hello(fd, caps_req, &caps_granted)) {
         close(fd);
         free(app);
         return NULL;
     }
-
     app->caps_granted = caps_granted;
+
+    /* Immediately read the LGP_MSG_OUTPUT_GEOMETRY message */
+    uint8_t geom_hdr[LGP_HEADER_SIZE];
+    if (lgui_read_exact(fd, geom_hdr, sizeof(geom_hdr))) {
+        uint16_t type = (uint16_t)(geom_hdr[0] | (geom_hdr[1] << 8));
+        uint32_t len  = read_u32_le(geom_hdr + 2);
+        if (type == 0x0300u && len >= LGP_HEADER_SIZE + 8u) {
+            uint8_t payload[8];
+            if (lgui_read_exact(fd, payload, 8)) {
+                app->output_width = read_u32_le(payload + 0);
+                app->output_height = read_u32_le(payload + 4);
+            }
+        }
+    }
+
     return app;
 }
 
@@ -261,13 +275,27 @@ lgui_application_t *lgui_application_create_wm(const char *name,
 
     uint32_t caps_granted = 0;
     uint32_t caps_req = LGP_CAP_CANVAS_SURFACE | LGP_CAP_LAYER_SHELL | LGP_CAP_LUNA_ISLAND | LGP_CAP_WINDOW_MANAGER;
-    if (!lgui_do_hello(fd, caps_req, &caps_granted)) { /* Includes LGP_CAP_WINDOW_MANAGER */
+    if (!lgui_do_hello(fd, caps_req, &caps_granted)) {
         close(fd);
         free(app);
         return NULL;
     }
-
     app->caps_granted = caps_granted;
+
+    /* Immediately read the LGP_MSG_OUTPUT_GEOMETRY message */
+    uint8_t geom_hdr[LGP_HEADER_SIZE];
+    if (lgui_read_exact(fd, geom_hdr, sizeof(geom_hdr))) {
+        uint16_t type = (uint16_t)(geom_hdr[0] | (geom_hdr[1] << 8));
+        uint32_t len  = read_u32_le(geom_hdr + 2);
+        if (type == 0x0300u && len >= LGP_HEADER_SIZE + 8u) {
+            uint8_t payload[8];
+            if (lgui_read_exact(fd, payload, 8)) {
+                app->output_width = read_u32_le(payload + 0);
+                app->output_height = read_u32_le(payload + 4);
+            }
+        }
+    }
+
     return app;
 }
 
@@ -389,13 +417,28 @@ void lgui_wm_set_surface_position(lgui_application_t *app, uint32_t surface_id, 
     lgui_write_all(app->lgp_fd, buf, sizeof(buf));
 }
 
-void lgui_wm_set_focus(lgui_application_t *app, uint32_t session_id) {
+void lgui_wm_set_focus(lgui_application_t *app, uint32_t surface_id) {
     if (!app || app->lgp_fd < 0) return;
     uint8_t buf[LGP_HEADER_SIZE + 4];
     write_u16_le(buf, LGP_MSG_WM_SET_FOCUS);
     write_u32_le(buf + 2, sizeof(buf));
-    write_u32_le(buf + LGP_HEADER_SIZE, session_id);
+    write_u32_le(buf + LGP_HEADER_SIZE, surface_id);
     lgui_write_all(app->lgp_fd, buf, sizeof(buf));
+}
+
+uint32_t lgui_output_width(lgui_application_t *app) {
+    return app ? app->output_width : 0;
+}
+
+uint32_t lgui_output_height(lgui_application_t *app) {
+    return app ? app->output_height : 0;
+}
+
+void lgui_application_set_output_geometry_cb(lgui_application_t *app, lgui_output_geometry_cb cb, void *user_data) {
+    if (app) {
+        app->output_geometry_cb = cb;
+        app->output_geometry_user_data = user_data;
+    }
 }
 
 void lgui_wm_set_state(lgui_application_t *app, uint32_t surface_id, uint32_t state) {
@@ -538,6 +581,16 @@ int lgui_application_run(lgui_application_t *app) {
                     if (payload_len >= 4u && app->wm_surface_destroyed_cb) {
                         uint32_t surface_id = read_u32_le(payload + 0);
                         app->wm_surface_destroyed_cb(surface_id, app->wm_user_data);
+                    }
+                } else if (type == 0x0300u) { /* LGP_MSG_OUTPUT_GEOMETRY */
+                    if (payload_len >= 8u) {
+                        uint32_t w = read_u32_le(payload + 0);
+                        uint32_t h = read_u32_le(payload + 4);
+                        app->output_width = w;
+                        app->output_height = h;
+                        if (app->output_geometry_cb) {
+                            app->output_geometry_cb(w, h, app->output_geometry_user_data);
+                        }
                     }
                 }
                 offset += len;

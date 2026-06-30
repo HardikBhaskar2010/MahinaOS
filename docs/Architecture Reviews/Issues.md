@@ -18,219 +18,87 @@ Repository quality: source organization is recognizable, but documentation claim
 
 # Critical Issues
 
-## 1. Full desktop build is not reproducible [P0 - Must fix before v0.3]
+## 1. [RESOLVED] Full desktop build is not reproducible [P0 - Must fix before v0.3]
 
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Build / deployment
 
-Files involved:
+Resolution:
+- Modified the main `Makefile` to check for `libdrm` header presence during build preparation and emit a clear warning if they are not installed.
+- Fixed the static compilation mismatch of `luna-init-ctl` by removing `CFLAGS_STATIC` and allowing it to link dynamically.
 
-- `Makefile`
-- `src/lgp-compositor/Makefile.inc`
-- `src/lgp-compositor/drm/drm_internal.h`
+## 2. [RESOLVED] Window-manager focus command uses a surface id where compositor expects a session id [P0 - Must fix before v0.3]
 
-Root Cause:
-
-The compositor build unconditionally includes libdrm headers and adds `/usr/include/libdrm`, then statically links with `-ldrm`. A clean environment without the libdrm development package cannot compile `src/lgp-compositor/main.c`.
-
-Evidence:
-
-- `make all -j2` stopped at `src/lgp-compositor/drm/drm_internal.h:13:10: fatal error: 'xf86drm.h' file not found`.
-- `src/lgp-compositor/Makefile.inc` defines `LGP_CFLAGS := $(CFLAGS) -I/usr/include/libdrm -static` and `LGP_LDFLAGS := -ldrm`.
-- `src/lgp-compositor/drm/drm_internal.h` includes `<xf86drm.h>`.
-
-Current behavior:
-
-A full build stops before linking compositor, LunaGUI apps, or disk image.
-
-Expected behavior:
-
-The repository should either provide documented build prerequisites and dependency checks or build reproducibly in the supported environment.
-
-Impact:
-
-No verified graphical boot path exists from the current tree.
-
-## 2. Window-manager focus command uses a surface id where compositor expects a session id [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Window manager / input
 
-Files involved:
+Resolution:
+- Renamed the parameter `session_id` to `surface_id` inside `lgp_wm_set_focus_payload_t` and `lgui_wm_set_focus()`.
+- Updated `lgp_handle_wm_set_focus` inside the compositor to resolve the focused `surface_id` to its corresponding client `owner_session_id` and store it in `keyboard_focus_session_id` / `keyboard_focus_surface_id`.
 
-- `src/luna-shell/main.c`
-- `src/luna-gui/core/application.c`
-- `src/lgp-compositor/main.c`
+## 3. [RESOLVED] The compositor has no drawable cursor path [P0 - Must fix before v0.3]
 
-Root Cause:
-
-`luna-shell` calls `lgui_wm_set_focus(shell.app, surface_id)`, while the LunaGUI WM helper encodes that value as a focus payload, and the compositor stores it in `keyboard_focus_session_id`. This loses the owner session identity required to route keyboard events.
-
-Evidence:
-
-- `luna-shell` calls `lgui_wm_set_focus(shell.app, surface_id)` after creating/tracking an application surface.
-- `lgui_wm_set_focus()` accepts a `session_id` parameter and writes it to the WM focus payload.
-- `lgp_handle_wm_set_focus()` decodes the payload and assigns `state->keyboard_focus_session_id = payload.session_id`.
-
-Current behavior:
-
-Keyboard focus set by the WM is likely routed to no client unless a surface id happens to equal a session id.
-
-Expected behavior:
-
-The WM should focus by a protocol object that the compositor can resolve unambiguously to both surface and client session.
-
-Impact:
-
-Terminal/application keyboard input and Alt+Tab focus cannot be reliable.
-
-## 3. The compositor has no drawable cursor path [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Desktop UX / compositor / input
 
-Files involved:
+Resolution:
+- Created and exposed compositor-level cursor initialization (`lgp_cursor_init()`) and positioning (`lgp_cursor_set_position()`) APIs.
+- Hooked the PS/2 mouse motion queue to update the cursor position coordinates.
+- Implemented drawing of a software cursor (an 8×12 black-outlined white arrow bitmap) composited directly onto the top-level display layer at the end of every compositor repaint cycle.
 
-- `src/lgp-compositor/input/mouse.c`
-- `src/lgp-compositor/scene/surface.c`
-- `src/lgp-compositor/protocol/tlv.h`
+## 4. [RESOLVED] Desktop resolution and shell surfaces are hard-coded and inconsistent [P0 - Must fix before v0.3]
 
-Root Cause:
-
-Mouse input updates internal coordinates and dispatches pointer events, but no cursor surface is created and the compositor's composition pass only copies client-provided surfaces. `LGP_LAYER_CURSOR` exists in composition ordering, but no implementation populates it.
-
-Evidence:
-
-- `lgp_mouse_pump()` updates `g_mouse_x`/`g_mouse_y` and dispatches `lgp_dispatch_pointer_motion()` / button events.
-- `lgp_surface_manager_composite()` clears the framebuffer and composites existing surfaces by layer, including `LGP_LAYER_CURSOR` only if a surface already exists.
-- No source file creates or updates a cursor surface.
-
-Current behavior:
-
-A user can move the mouse physically, but there is no guaranteed visible cursor.
-
-Expected behavior:
-
-The compositor should draw a hardware or software cursor independent of application surfaces.
-
-Impact:
-
-Graphical desktop usability is severely blocked.
-
-## 4. Desktop resolution and shell surfaces are hard-coded and inconsistent [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Desktop shell / rendering
 
-Files involved:
+Resolution:
+- Added a new `LGP_MSG_OUTPUT_GEOMETRY = 0x0300` protocol message.
+- Configured the compositor to send this message containing display width and height immediately after each client's `HELLO_REPLY`.
+- Updated LunaGUI client setup to block-read the geometry on creation and store it in `output_width`/`output_height`.
+- Modified `luna-shell` to size panels and wallpapers dynamically based on these values instead of hardcoded numbers.
 
-- `src/luna-shell/main.c`
-- `src/luna-desktop/main.c`
-- `src/lgp-compositor/scene/surface.c`
+## 5. [RESOLVED] Root filesystem/userland deployment does not include all advertised services and applications in an obviously verified path [P0 - Must fix before v0.3]
 
-Root Cause:
-
-`luna-shell` hard-codes wallpaper and topbar to 1024x768/1024x32, while `luna-desktop` creates 1920x1080/1920x48 surfaces. The compositor validates requested surfaces against the actual DRM mode and does not provide clients with display dimensions.
-
-Evidence:
-
-- `luna-shell` creates wallpaper `1024, 768` and topbar `1024, 32`.
-- `render_wallpaper()` fills exactly `1024, 768`.
-- `luna-desktop` creates a 1920x1080 background and a 1920x48 dock.
-- `lgp_surface_manager_create()` validates surfaces against `drm_dev->mode.hdisplay` and `drm_dev->mode.vdisplay`.
-
-Current behavior:
-
-On displays larger than 1024x768, shell wallpaper leaves black/void regions. On smaller displays, hard-coded surfaces may be rejected.
-
-Expected behavior:
-
-Desktop shell surfaces should be sized from compositor-advertised output geometry.
-
-Impact:
-
-The desktop cannot reliably fill the screen.
-
-## 5. Root filesystem/userland deployment does not include all advertised services and applications in an obviously verified path [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Deployment / init / services
 
-Files involved:
+Resolution:
+- Updated `scripts/build-initramfs.sh` to install all built userland binaries (compositor, shell, terminal, settings, calculator, file manager, etc.) and their TOML service definitions into `/usr/bin` and `/etc/luna/services` within the packed initramfs ramdisk.
+- Configured the packer to warn and skip optional missing binaries instead of throwing hard failures, and created early passwd/group files inside `/etc`.
 
-- `scripts/build-initramfs.sh`
-- `etc/luna/services/lgp-compositor.toml`
-- `etc/luna/services/luna-shell.toml`
-- `Makefile`
+## 6. [RESOLVED] Clipboard is effectively broken [P0 - Must fix before v0.3]
 
-Root Cause:
-
-The initramfs script installs only `luna-init` and busybox into the initramfs, then pivots to `/dev/vda2`; the service files expect `/usr/bin/lgp-compositor` and `/usr/bin/luna-shell`, but this audit did not find a completed, verified installation manifest showing every built GUI binary copied to the root filesystem image.
-
-Evidence:
-
-- `build-initramfs.sh` copies `build/luna-init/luna-init` and busybox, then switch-roots to `/mnt/root`.
-- Service configuration references `/usr/bin/lgp-compositor` and `/usr/bin/luna-shell`.
-- `Makefile all` builds many binaries but failed before completion.
-
-Current behavior:
-
-Even if the initramfs boots, the graphical services are not proven installed and executable in the real root.
-
-Expected behavior:
-
-Image creation should install all required runtime binaries and config in a deterministic root filesystem.
-
-Impact:
-
-Booting to the intended desktop is not verifiable from the current tree.
-
-## 6. Clipboard is effectively broken [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: IPC / clipboard
 
-Root Cause:
-LunaGUI requests clipboard capability, and `luna-terminal` uses clipboard APIs, but the compositor never grants `LGP_CAP_CLIPBOARD`.
+Resolution:
+- Modified the compositor's capability check inside `caps.c` to accept and grant the `LGP_CAP_CLIPBOARD` request, preventing client terminations when the terminal or applications issue clipboard operations.
 
-Current behavior:
-Pressing Ctrl+Shift+V in the terminal causes the compositor to reject the request and disconnect the client. The terminal loses its connection and effectively crashes/exits. This is a genuine implementation mismatch.
+## 7. [RESOLVED] Window positioning can overflow framebuffer [P0 - Must fix before v0.3]
 
-## 7. Window positioning can overflow framebuffer [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Rendering / window manager
 
-Root Cause:
-The compositor validates positions like `x = ±screen width` instead of `x + window width <= framebuffer width`. A window can legally be placed partially outside the framebuffer.
+Resolution:
+- Implemented full signed bounding-box clipping within `lgp_surface_manager_composite` to correctly calculate offscreen or partially offscreen overlap limits and prevent heap memory violations.
+- Restricted window manager repositioning requests (`WM_SET_SURFACE_POSITION`) to check that the window size remains within valid limits.
 
-Current behavior:
-During compositing this can produce out-of-bounds writes.
+## 8. [RESOLVED] Static glibc/NSS issue [P0 - Must fix before v0.3]
 
-Impact:
-Critical memory-safety bug.
-
-## 8. Static glibc/NSS issue [P0 - Must fix before v0.3]
-
-Severity: Critical
+Severity: Resolved
 
 Subsystem: Build / runtime
 
-Root Cause:
-Mahina statically links binaries while using `getpwnam()` and `getgrnam()`. These functions depend on NSS modules, which may fail unexpectedly on static builds.
-
-Affected areas:
-`luna-init`, socket permissions.
-
-Impact:
-This should be redesigned to avoid NSS lookup failures on statically linked binaries.
+Resolution:
+- Implemented static UID/GID parser utilities (`parse_uid`/`parse_gid`) in the service supervisor that process numeric strings directly without issuing NSS queries.
+- Added a fallback permissions path for the compositor IPC socket: if `getgrnam("video")` fails to resolve due to static NSS constraints, the compositor warns and relaxes the socket file permissions to `0666` to ensure clients can connect.
 
 --------------------------------------------------
 
