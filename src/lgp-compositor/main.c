@@ -17,8 +17,10 @@
 #include "ipc/client.h"
 #include "protocol/tlv.h"
 #include "protocol/hello.h"
+#include "protocol/caps.h"
 #include "protocol/surface.h"
 #include "scene/surface.h"
+#include "input/mouse.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -31,14 +33,54 @@
 #define MAX_EVENTS 16
 #define RUNTIME_LOG_PATH "/var/log/luna-init/runtime.log"
 
-typedef struct {
-    int epoll_fd;
-    int signal_fd;
-    bool running;
-    uint32_t next_session_id;
-    lgp_client_t *clients;
-    lgp_surface_manager_t surface_manager;
-} lgp_compositor_state_t;
+#include "main.h"
+
+static bool lgp_write_all(int fd, const uint8_t *buf, size_t len);
+
+void lgp_dispatch_pointer_motion(lgp_compositor_state_t *state, int x, int y) {
+    if (!state) return;
+    
+    int top_layer = -1;
+    uint32_t target_session_id = 0;
+    
+    for (size_t i = 0; i < LGP_SURFACE_MAX; i++) {
+        lgp_surface_t *s = &state->surface_manager.surfaces[i];
+        if (!s->in_use) continue;
+        
+        if (x >= s->x && x < s->x + (int32_t)s->width &&
+            y >= s->y && y < s->y + (int32_t)s->height) {
+            
+            if ((int)s->layer > top_layer) {
+                top_layer = s->layer;
+                target_session_id = s->owner_session_id;
+            }
+        }
+    }
+    
+    if (target_session_id > 0) {
+        lgp_client_t *client = state->clients;
+        while (client) {
+            if (client->session_id == target_session_id) {
+                uint8_t payload[8];
+                payload[0] = (x >> 24) & 0xFF;
+                payload[1] = (x >> 16) & 0xFF;
+                payload[2] = (x >> 8) & 0xFF;
+                payload[3] = x & 0xFF;
+                payload[4] = (y >> 24) & 0xFF;
+                payload[5] = (y >> 16) & 0xFF;
+                payload[6] = (y >> 8) & 0xFF;
+                payload[7] = y & 0xFF;
+                
+                uint8_t frame[LGP_HEADER_SIZE + 8];
+                lgp_tlv_encode_header(frame, LGP_MSG_POINTER_MOTION, sizeof(frame));
+                memcpy(frame + LGP_HEADER_SIZE, payload, 8);
+                lgp_write_all(client->fd, frame, sizeof(frame));
+                break;
+            }
+            client = client->next;
+        }
+    }
+}
 
 static bool lgp_write_all(int fd, const uint8_t *buf, size_t len) {
     size_t written = 0;
@@ -188,6 +230,14 @@ static int lgp_client_read_available(lgp_client_t *client) {
 }
 
 static bool lgp_handle_fill_rect(lgp_client_t *client, const lgp_msg_t *msg, drm_device_t *drm_dev) {
+    /* Security: FILL_RECT requires LGP_CAP_DIRECT_LGP — unprivileged apps must
+     * use surfaces via CREATE_SURFACE/COMMIT_BUFFER instead. */
+    if (!(client->caps_granted & LGP_CAP_DIRECT_LGP)) {
+        LGP_WARN("protocol", "Client session=%u attempted FILL_RECT without LGP_CAP_DIRECT_LGP",
+                 client->session_id);
+        return false;
+    }
+
     size_t payload_len = msg->length - LGP_HEADER_SIZE;
     if (payload_len < 4) {
         LGP_WARN("protocol", "Client session=%u sent short FILL_RECT payload", client->session_id);
@@ -440,7 +490,6 @@ int main(int argc, char **argv) {
         lgp_log_close();
         return 1;
     }
-
     /* Register signalfd with epoll */
     struct epoll_event ev;
     ev.events = EPOLLIN;
@@ -470,6 +519,16 @@ int main(int argc, char **argv) {
         close(state.epoll_fd);
         lgp_log_close();
         return 1;
+    }
+
+    /* Mouse input — init AFTER connector setup so mode dimensions are known */
+    lgp_mouse_init((uint32_t)drm_dev.mode.hdisplay, (uint32_t)drm_dev.mode.vdisplay);
+    int mouse_fd = lgp_mouse_get_fd();
+    if (mouse_fd >= 0) {
+        struct epoll_event ev_mouse = {0};
+        ev_mouse.events = EPOLLIN;
+        ev_mouse.data.fd = mouse_fd;
+        epoll_ctl(state.epoll_fd, EPOLL_CTL_ADD, mouse_fd, &ev_mouse);
     }
 
     drm_dev.front_buffer = kms_dumb_buffer_create(&drm_dev, drm_dev.mode.hdisplay, drm_dev.mode.vdisplay);
@@ -539,6 +598,8 @@ int main(int argc, char **argv) {
                 }
             } else if (fd == drm_dev.fd) {
                 kms_handle_events(&drm_dev);
+            } else if (mouse_fd >= 0 && fd == mouse_fd) {
+                lgp_mouse_pump(&state);
             } else if (fd == listen_fd) {
                 int client_fd = lgp_socket_server_accept(listen_fd);
                 if (client_fd >= 0) {

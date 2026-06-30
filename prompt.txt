@@ -1,0 +1,254 @@
+You are now the Lead Systems Engineer for MahinaOS.
+
+Read the ENTIRE repository before writing or modifying a single line of code.
+
+Read in this order:
+
+1. MAHINA_ENGINEERING_SNAPSHOT.md (Ground Truth)
+2. docs/DCKL/
+3. docs/System Prompts/IMPLEMENTATION_STATUS.md
+4. Decision Logs
+5. Source code
+
+Never assume documentation is correct if it contradicts implementation.
+The engineering snapshot is the source of truth.
+
+==========================================
+MISSION
+==========================================
+
+We are beginning the first usable graphical environment for MahinaOS.
+
+DO NOT redesign architecture.
+DO NOT replace existing systems.
+DO NOT change the LGP protocol.
+DO NOT introduce Wayland, wlroots, Hyprland, GTK or Qt.
+
+Everything must be built on Mahina's own stack.
+
+Current stack:
+
+luna-init
+↓
+luna-splash
+↓
+lgp-compositor
+↓
+LunaGUI (to build)
+↓
+luna-shell
+↓
+Desktop
+
+==========================================
+FIRST GOAL
+==========================================
+
+Create LunaGUI.
+
+Implement the first client library capable of talking to the existing LGP compositor.
+
+Create:
+
+src/lunagui/
+
+with
+
+Window
+Application
+Canvas
+Label
+Button
+Image
+Container
+Layout
+Renderer
+Surface
+Event Loop
+IPC Client
+
+Implement only what is required to render windows using the current compositor protocol.
+
+==========================================
+SECOND GOAL
+==========================================
+
+Once LunaGUI can create windows, begin implementing the first desktop session.
+
+Create:
+
+luna-shell
+
+Responsibilities:
+
+- Desktop background
+- Window manager
+- Top bar
+- Dock
+- Basic launcher
+- Shutdown dialog
+
+Minimal.
+Functional.
+No polish yet.
+
+==========================================
+THIRD GOAL
+==========================================
+
+Create the Mahina Installer.
+
+Requirements:
+
+- Runs as a LunaGUI application.
+- Uses existing graphics stack.
+- No TUI installer.
+
+Pages:
+
+Welcome
+
+Language
+
+Keyboard
+
+Disk Selection
+
+Partitioning
+
+Timezone
+
+User Creation
+
+Hostname
+
+Summary
+
+Installation Progress
+
+Finish
+
+The installer does NOT have to install yet.
+
+Focus on building the complete GUI workflow first.
+
+==========================================
+FOURTH GOAL
+==========================================
+
+Create the First Boot Experience.
+
+Flow:
+
+Power On
+
+↓
+
+luna-splash
+
+↓
+
+Fade animation
+
+↓
+
+Luna Logo
+
+↓
+
+Desktop Appears
+
+↓
+
+Welcome Wizard
+
+↓
+
+Desktop
+
+No shell should be visible.
+
+==========================================
+FIFTH GOAL
+==========================================
+
+Terminal
+
+Implement a Luna Terminal application using LunaGUI.
+
+Features:
+
+- PTY support
+- ANSI colors
+- Scrollback
+- Copy/Paste
+- Tabs later
+- Search later
+
+Commands should execute through the existing shell.
+
+==========================================
+SIXTH GOAL
+==========================================
+
+Create desktop applications.
+
+Calculator
+
+Settings
+
+Files
+
+Text Editor
+
+Terminal
+
+Task Manager
+
+About Mahina
+
+Each should be built using LunaGUI.
+
+==========================================
+RULES
+
+Never modify architecture without a Decision Log.
+
+Never replace existing code with new architecture.
+
+Preserve all DCKL principles.
+
+Follow existing coding standards.
+
+Document every change.
+
+After each milestone:
+
+1. Build
+2. Run tests
+3. Fix warnings
+4. Update IMPLEMENTATION_STATUS.md
+5. Update CHANGELOG.md
+
+Never continue after failing tests.
+
+==========================================
+OUTPUT STYLE
+
+Work in small commits.
+
+Before every coding session:
+
+- explain the implementation plan
+- list affected files
+- identify risks
+
+After every coding session:
+
+- summarize completed work
+- list remaining work
+- recommend the next milestone
+
+Do not stop after creating stubs.
+
+Continue implementing until each milestone is functional.

@@ -2,7 +2,7 @@
 # build-kernel.sh — Compile a custom monolithic Linux kernel for Mahina OS
 set -e
 
-KERNEL_VERSION="6.9.7"
+KERNEL_VERSION="6.6.36"
 BUILD_DIR="/tmp/mahina-kernel-build"
 MAHINA_VMLINUZ="$(pwd)/build/vmlinuz-mahina"
 

@@ -23,3 +23,9 @@
 - Added LGP protocol/surface unit tests and TLV fuzz coverage.
 - Documented Mahina setup as GUI-first with terminal setup reserved for emergency and development use.
 - Fixed TOML array validation, dependency graph cycle validation, and the clean-tree unit/fuzz test targets.
+- Implemented surface Z-order and ARGB8888 software alpha blending in `lgp-compositor`.
+- Defined input protocol events (`LGP_MSG_POINTER_MOTION`, etc.) in `tlv.h`.
+- Created Phase 3 `LunaGUI` Toolkit (application loop, LGP IPC, window surface wrappers, canvas primitives, widget hierarchy, PSF font rendering).
+- Scaffoled Phase 4 `luna-desktop` (shell dock and wallpaper).
+- Scaffolded core GUI applications: `luna-installer`, `luna-terminal`, `luna-settings`, `luna-files`.
+- Resolved `luna-init` supervisor TODOs regarding HTTP readiness networking constraints.

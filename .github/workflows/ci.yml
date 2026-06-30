@@ -28,11 +28,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y clang lld llvm make
 
-      - name: Build luna-init (static)
-        run: make luna-init CC=clang
-
-      - name: Build luna-init-ctl
-        run: make luna-init-ctl CC=clang
+      - name: Build all targets
+        run: make all CC=clang
 
       - name: Check binary size (luna-init must fit in initramfs)
         run: |

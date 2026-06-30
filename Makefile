@@ -162,7 +162,7 @@ LGP_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint help
 
-all: luna-init luna-init-ctl luna-splash
+all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-desktop luna-installer luna-terminal luna-settings luna-files
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -340,7 +340,7 @@ lint:
 	clang-tidy \
 	    --checks='-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,cert-*,-cert-err33-c,-cert-err34-c,bugprone-*,-bugprone-easily-swappable-parameters,performance-*,portability-*,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-braces-around-statements,-readability-math-missing-parentheses,-readability-function-cognitive-complexity' \
 	    --warnings-as-errors='*' \
-	    $(LUNA_INIT_SOURCES) $(LUNA_CTL_SOURCES) $(LUNA_SPLASH_SOURCES) \
+	    $(LUNA_INIT_SOURCES) $(LUNA_CTL_SOURCES) $(LUNA_SPLASH_SOURCES) $(LGP_COMPOSITOR_SOURCES) \
 	    -- $(CFLAGS) $(INCLUDES)
 
 # ---------------------------------------------------------------------------
@@ -395,3 +395,33 @@ help:
 # lgp-compositor
 # ---------------------------------------------------------------------------
 include src/lgp-compositor/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# LunaGUI
+# ---------------------------------------------------------------------------
+include src/luna-gui/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-desktop
+# ---------------------------------------------------------------------------
+include src/luna-desktop/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-installer
+# ---------------------------------------------------------------------------
+include src/luna-installer/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-terminal
+# ---------------------------------------------------------------------------
+include src/luna-terminal/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-settings
+# ---------------------------------------------------------------------------
+include src/luna-settings/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-files
+# ---------------------------------------------------------------------------
+include src/luna-files/Makefile.inc

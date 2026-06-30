@@ -1,0 +1,301 @@
+/*
+ * Copyright (c) 2026 Hardik Bhaskar
+ *
+ * Licensed under the MIT License.
+ * See the LICENSE file for details.
+ */
+
+/*
+ * LunaGUI Application — LGP client connection and main event loop.
+ *
+ * This module opens a connection to the lgp-compositor socket, performs the
+ * LGP_HELLO handshake (per DL-053 wire format), and drives the poll()-based
+ * event loop that dispatches both compositor input events and user-registered
+ * file descriptors.
+ */
+
+#include "lunagui.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <poll.h>
+
+#include "lgui_private.h"
+
+/* LGP wire-format constants — must match lgp-compositor/protocol/ */
+#define LGP_SOCKET_PATH        "/run/lgp/compositor.sock"
+#define LGP_HEADER_SIZE        6u
+#define LGP_MSG_HELLO          0x0001u
+#define LGP_MSG_HELLO_REPLY    0x0002u
+#define LGP_VERSION_MAJOR      1u
+#define LGP_VERSION_MINOR      0u
+/* Capability bits (must match lgp-compositor/protocol/caps.h) */
+#define LGP_CAP_CANVAS_SURFACE (1u << 1)
+#define LGP_CAP_LAYER_SHELL    (1u << 3)
+#define LGP_CAP_LUNA_ISLAND    (1u << 4)
+
+/* ---------------------------------------------------------------------------
+ * Internal helpers
+ * ---------------------------------------------------------------------------*/
+
+static void write_u16_le(uint8_t *p, uint16_t v) {
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)((v >> 8) & 0xFFu);
+}
+
+static void write_u32_le(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v & 0xFFu);
+    p[1] = (uint8_t)((v >> 8) & 0xFFu);
+    p[2] = (uint8_t)((v >> 16) & 0xFFu);
+    p[3] = (uint8_t)((v >> 24) & 0xFFu);
+}
+
+static uint32_t read_u32_le(const uint8_t *p) {
+    return (uint32_t)p[0]
+         | ((uint32_t)p[1] << 8)
+         | ((uint32_t)p[2] << 16)
+         | ((uint32_t)p[3] << 24);
+}
+
+/* Write all bytes to fd, retrying on EINTR. Returns false on permanent error. */
+static bool lgui_write_all(int fd, const uint8_t *buf, size_t len) {
+    size_t written = 0;
+    while (written < len) {
+        ssize_t n = write(fd, buf + written, len - written);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        if (n == 0) return false;
+        written += (size_t)n;
+    }
+    return true;
+}
+
+/* Read exactly `len` bytes from fd, retrying on EINTR.
+ * Returns false if the connection closes or a permanent error occurs. */
+static bool lgui_read_exact(int fd, uint8_t *buf, size_t len) {
+    size_t got = 0;
+    while (got < len) {
+        ssize_t n = read(fd, buf + got, len - got);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        if (n == 0) return false; /* EOF — compositor disconnected */
+        got += (size_t)n;
+    }
+    return true;
+}
+
+/* ---------------------------------------------------------------------------
+ * LGP HELLO handshake
+ *
+ * Wire format for LGP_HELLO (per DL-053 / hello.h):
+ *   [6-byte TLV header: uint16_t type | uint32_t total_length]
+ *   uint16_t version_major  (LE)
+ *   uint16_t version_minor  (LE)
+ *   uint32_t caps_requested (LE)
+ *
+ * The compositor replies with LGP_HELLO_REPLY (same structure, caps = granted).
+ * We must read and parse the reply before sending any other messages.
+ * ---------------------------------------------------------------------------*/
+static bool lgui_do_hello(int fd, uint32_t *out_caps_granted) {
+    /* HELLO payload: 2 (major) + 2 (minor) + 4 (caps) = 8 bytes */
+    const uint32_t payload_len = 8u;
+    const uint32_t total_len   = (uint32_t)LGP_HEADER_SIZE + payload_len;
+
+    uint8_t hello[LGP_HEADER_SIZE + 8u];
+    write_u16_le(hello + 0, (uint16_t)LGP_MSG_HELLO);
+    write_u32_le(hello + 2, total_len);
+    write_u16_le(hello + 6, (uint16_t)LGP_VERSION_MAJOR);
+    write_u16_le(hello + 8, (uint16_t)LGP_VERSION_MINOR);
+    write_u32_le(hello + 10, LGP_CAP_CANVAS_SURFACE | LGP_CAP_LAYER_SHELL | LGP_CAP_LUNA_ISLAND);
+
+    if (!lgui_write_all(fd, hello, sizeof(hello))) {
+        fprintf(stderr, "lunagui: failed to send LGP_HELLO\n");
+        return false;
+    }
+
+    /* Read the 6-byte TLV header of the reply */
+    uint8_t reply_hdr[LGP_HEADER_SIZE];
+    if (!lgui_read_exact(fd, reply_hdr, sizeof(reply_hdr))) {
+        fprintf(stderr, "lunagui: failed to read LGP_HELLO_REPLY header\n");
+        return false;
+    }
+
+    uint16_t reply_type = (uint16_t)(reply_hdr[0] | (reply_hdr[1] << 8));
+    uint32_t reply_len  = read_u32_le(reply_hdr + 2);
+
+    if (reply_type != LGP_MSG_HELLO_REPLY) {
+        fprintf(stderr, "lunagui: expected HELLO_REPLY (0x%04X), got 0x%04X\n",
+                LGP_MSG_HELLO_REPLY, reply_type);
+        return false;
+    }
+
+    if (reply_len < LGP_HEADER_SIZE + 8u) {
+        fprintf(stderr, "lunagui: HELLO_REPLY payload too short (%u bytes)\n", reply_len);
+        return false;
+    }
+
+    /* Read the HELLO_REPLY payload */
+    const uint32_t payload_bytes = reply_len - (uint32_t)LGP_HEADER_SIZE;
+    uint8_t *reply_payload = malloc(payload_bytes);
+    if (!reply_payload) return false;
+
+    bool ok = lgui_read_exact(fd, reply_payload, payload_bytes);
+    if (ok && out_caps_granted) {
+        /* Payload: uint16_t major, uint16_t minor, uint32_t caps_granted */
+        *out_caps_granted = read_u32_le(reply_payload + 4);
+    }
+    free(reply_payload);
+
+    if (!ok) {
+        fprintf(stderr, "lunagui: failed to read LGP_HELLO_REPLY payload\n");
+        return false;
+    }
+
+    return true;
+}
+
+/* ---------------------------------------------------------------------------
+ * Public API
+ * ---------------------------------------------------------------------------*/
+
+lgui_application_t *lgui_application_create(const char *name) {
+    if (!name) return NULL;
+
+    lgui_application_t *app = calloc(1, sizeof(lgui_application_t));
+    if (!app) return NULL;
+
+    strncpy(app->name, name, sizeof(app->name) - 1);
+    app->lgp_fd = -1;
+
+    /* Initialise font rendering (loads PSF font if available) */
+    lgui_font_init("/usr/share/fonts/luna-8x16.psf");
+
+    /* Open connection to the compositor */
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0) {
+        free(app);
+        return NULL;
+    }
+
+    struct sockaddr_un addr = {0};
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, LGP_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "lunagui: cannot connect to compositor at %s: %s\n",
+                LGP_SOCKET_PATH, strerror(errno));
+        close(fd);
+        free(app);
+        return NULL;
+    }
+
+    app->lgp_fd = fd;
+
+    /* Perform the LGP_HELLO handshake — mandatory before any other message */
+    uint32_t caps_granted = 0;
+    if (!lgui_do_hello(fd, &caps_granted)) {
+        close(fd);
+        free(app);
+        return NULL;
+    }
+
+    app->caps_granted = caps_granted;
+    return app;
+}
+
+void lgui_application_destroy(lgui_application_t *app) {
+    if (!app) return;
+    if (app->lgp_fd >= 0) close(app->lgp_fd);
+    free(app);
+}
+
+void lgui_application_quit(lgui_application_t *app) {
+    if (app) app->running = false;
+}
+
+void lgui_application_add_fd(lgui_application_t *app, int fd, lgui_fd_callback_t cb, void *user_data) {
+    if (!app || app->custom_fd_count >= 8) return;
+    app->custom_fds[app->custom_fd_count].fd        = fd;
+    app->custom_fds[app->custom_fd_count].cb        = cb;
+    app->custom_fds[app->custom_fd_count].user_data = user_data;
+    app->custom_fd_count++;
+}
+
+int lgui_application_run(lgui_application_t *app) {
+    if (!app) return -1;
+    app->running = true;
+
+    /* +1 for the compositor fd, +N for user-registered fds */
+    struct pollfd pfds[9];
+
+    while (app->running) {
+        pfds[0].fd      = app->lgp_fd;
+        pfds[0].events  = POLLIN;
+        pfds[0].revents = 0;
+
+        int pfd_count = 1;
+        for (int i = 0; i < app->custom_fd_count; i++) {
+            pfds[pfd_count].fd      = app->custom_fds[i].fd;
+            pfds[pfd_count].events  = POLLIN;
+            pfds[pfd_count].revents = 0;
+            pfd_count++;
+        }
+
+        int r = poll(pfds, (nfds_t)pfd_count, 16); /* ~60 fps poll interval */
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+
+        /* Compositor fd events */
+        if (pfds[0].revents & (POLLERR | POLLHUP)) {
+            break; /* Compositor disconnected */
+        }
+
+        if (pfds[0].revents & POLLIN) {
+            uint8_t rx[4096];
+            ssize_t n = read(app->lgp_fd, rx, sizeof(rx));
+            if (n <= 0) break;
+
+            /* Parse incoming TLV frames */
+            size_t offset = 0;
+            while (offset + (size_t)LGP_HEADER_SIZE <= (size_t)n) {
+                uint16_t type = (uint16_t)(rx[offset] | (rx[offset + 1] << 8));
+                uint32_t len  = read_u32_le(rx + offset + 2);
+
+                if (len < LGP_HEADER_SIZE || offset + len > (size_t)n) break;
+
+                if (type == 0x0110u || type == 0x0111u) {
+                    /* POINTER_MOTION / POINTER_BUTTON — route to focused window */
+                    /* TODO(Phase B): implement hit-test and on_click routing */
+                    (void)0;
+                }
+                offset += len;
+            }
+        }
+
+        /* User-registered fd callbacks */
+        for (int i = 0; i < app->custom_fd_count; i++) {
+            if (pfds[i + 1].revents & POLLIN) {
+                app->custom_fds[i].cb(app->custom_fds[i].fd, app->custom_fds[i].user_data);
+            }
+        }
+
+        /* Re-render any dirty windows */
+        for (int i = 0; i < app->window_count; i++) {
+            if (app->windows[i] && app->windows[i]->dirty) {
+                lgui_window_update(app->windows[i]);
+            }
+        }
+    }
+
+    return 0;
+}

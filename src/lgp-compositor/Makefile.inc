@@ -21,7 +21,8 @@ LGP_COMPOSITOR_SOURCES := \
     $(LGP_COMPOSITOR_SRC)/protocol/hello.c \
     $(LGP_COMPOSITOR_SRC)/protocol/caps.c \
     $(LGP_COMPOSITOR_SRC)/protocol/surface.c \
-    $(LGP_COMPOSITOR_SRC)/scene/surface.c
+    $(LGP_COMPOSITOR_SRC)/scene/surface.c \
+    $(LGP_COMPOSITOR_SRC)/input/mouse.c
 
 LGP_COMPOSITOR_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LGP_COMPOSITOR_SOURCES))
 

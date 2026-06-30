@@ -29,6 +29,9 @@
 #define LGP_MSG_CREATE_SURFACE_REPLY 0x0101
 #define LGP_MSG_DESTROY_SURFACE      0x0102
 #define LGP_MSG_COMMIT_BUFFER        0x0103
+#define LGP_MSG_POINTER_MOTION       0x0110
+#define LGP_MSG_POINTER_BUTTON       0x0111
+#define LGP_MSG_KEYBOARD_KEY         0x0112
 #define LGP_MSG_ERROR       0xFFFF
 
 typedef struct {

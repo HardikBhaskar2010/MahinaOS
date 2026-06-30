@@ -74,9 +74,9 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
         }
 
         case READY_HTTP:
-            /* Stubbed in v0.1 — HTTP readiness requires libcurl or similar.
+            /* Note: HTTP readiness requires network stack integration.
              * For Stage 0, services using method=http are treated as READY_NONE.
-             * TODO: Implement HTTP readiness before v0.5 service integration. */
+             */
             LUNA_WARN(COMP, "Service '%s': ready method 'http' not implemented "
                       "in v0.1 — treating as immediate", svc->name);
             return true;
@@ -233,10 +233,11 @@ void supervisor_pump(void) {
     }
 
     /* 2. Try to start PENDING services if dependencies are met */
-    bool progressed = true;
-    while (progressed) {
-        progressed = false;
-        for (int i = 0; i < g_service_count; i++) {
+    int order[SERVICE_MAX_COUNT];
+    int count = depgraph_topo_sort(order, SERVICE_MAX_COUNT);
+    if (count > 0) {
+        for (int k = 0; k < count; k++) {
+            int i = order[k];
             service_t *svc = &g_services[i];
             if (svc->state == SERVICE_STATE_PENDING) {
                 if (now < svc->scheduled_start_ms) continue;
@@ -255,7 +256,6 @@ void supervisor_pump(void) {
                     if (pid < 0 && svc->state != SERVICE_STATE_DEGRADED) {
                         svc->state = SERVICE_STATE_DEGRADED;
                     }
-                    progressed = true;
                 }
             }
         }

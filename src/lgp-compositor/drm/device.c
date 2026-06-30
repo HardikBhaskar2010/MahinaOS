@@ -22,9 +22,12 @@ int drm_device_open(drm_device_t *dev, const char *path) {
         return -errno;
     }
 
-    /* We implicitly acquire DRM master by opening the device, assuming luna-splash has closed it.
-       If it fails, it means we don't have master, but we can try to explicitly acquire it if needed,
-       or we can proceed and fail on mode set. We assume success for now per bring-up plan. */
+    if (drmSetMaster(dev->fd) != 0) {
+        LGP_ERROR("drm", "Failed to acquire DRM master on %s: %s", path, strerror(errno));
+        close(dev->fd);
+        dev->fd = -1;
+        return -errno;
+    }
 
     /* Check for atomic modesetting support */
     if (drmSetClientCap(dev->fd, DRM_CLIENT_CAP_ATOMIC, 1) == 0) {
