@@ -309,6 +309,7 @@ test-unit: $(UNITY_OBJ) $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(
 	    echo "  BUILD   $$name"; \
 	    $(CC) $(CFLAGS_TEST) $(INCLUDES) \
 	        -I$(TESTS_DIR)/vendor/unity \
+	        -I$(SRC_DIR)/luna-gui/include \
 	        $$src \
 	        $(LUNA_GUI_UNIT_TEST_SUPPORT) \
 	        $(UNITY_OBJ) \
