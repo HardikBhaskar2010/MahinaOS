@@ -119,16 +119,19 @@ impl SettingsApp {
 
 fn main() -> std::io::Result<()> {
     let mut conn = LgpConnection::connect(LGP_CAP_CANVAS_SURFACE | LGP_CAP_KEYBOARD | LGP_CAP_POINTER)?;
-    let width = conn.output_width;
-    let height = conn.output_height;
+    let width = 480;
+    let height = 400;
 
     let mut surface = LgpSurface::create(
         &mut conn, LGP_SURFACE_CANVAS_SURFACE, 0, 0,
-        width, height, LGP_LAYER_SHELL, false,
+        width, height, LGP_LAYER_APPLICATION, true,
     )?;
 
-    let app = SettingsApp { page: 0, cursor_y: 0 };
-    let mut app = app;
+    conn.set_nonblocking(true)?;
+
+    let mut app = SettingsApp { page: 0, cursor_y: 0 };
+    let mut cursor_x = (width / 2) as i32;
+    let mut cursor_y = (height / 2) as i32;
 
     loop {
         {
@@ -161,13 +164,18 @@ fn main() -> std::io::Result<()> {
                             }
                         }
                     }
+                    t if t == LgpMessageType::PointerMotion as u16 => {
+                        if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                            cursor_x = ev.x as i32;
+                            cursor_y = ev.y as i32;
+                            app.cursor_y = cursor_y;
+                        }
+                    }
                     t if t == LgpMessageType::PointerButton as u16 => {
                         if let Some(ev) = parse_pointer_button(&msg.payload) {
                             if ev.pressed {
-                                let px = ev.x as i32;
-                                let py = ev.y as i32;
-                                if px < 160 && py >= 8 {
-                                    let p = (py - 8) / 28;
+                                if cursor_x < 160 && cursor_y >= 8 {
+                                    let p = (cursor_y - 8) / 28;
                                     if p >= 0 && p <= 4 { app.page = p as usize; }
                                 }
                             }

@@ -130,22 +130,15 @@ impl CalcApp {
     }
 
     fn render(&self, pixels: &mut [u8], stride: u32, width: u32, height: u32) {
-        let aw = 320i32.min(width as i32);
-        let ah = 400i32.min(height as i32);
-        let ax = (width as i32 - aw) / 2;
-        let ay = (height as i32 - ah) / 2;
-
         fill_rect_on_slice(pixels, stride, width, height, 0, 0, width as i32, height as i32, COLOR_BG);
-        fill_rect_on_slice(pixels, stride, width, height, ax, ay, aw, ah, COLOR_RAISED);
-
-        fill_rect_on_slice(pixels, stride, width, height, ax + 8, ay + 8, aw - 16, 48, COLOR_BG);
+        fill_rect_on_slice(pixels, stride, width, height, 8, 8, width as i32 - 16, 48, COLOR_RAISED);
         let display_color = if self.error { 0xFFFF4444 } else { COLOR_TEXT };
         let ds = if self.display.len() > 16 {
             &self.display[self.display.len() - 16..]
         } else {
             &self.display
         };
-        draw_text_on_slice(pixels, stride, width, ax + aw - 8 - ds.len() as i32 * 8, ay + 20, ds, display_color);
+        draw_text_on_slice(pixels, stride, width, width as i32 - 8 - ds.len() as i32 * 8, 20, ds, display_color);
 
         let buttons = [
             ['7', '8', '9', '/'],
@@ -155,12 +148,12 @@ impl CalcApp {
             ['(', ')', '\x08', '='],
         ];
 
-        let bw = (aw - 20) / 4;
-        let bh = (ah - 76) / 5;
+        let bw = (width as i32 - 20) / 4;
+        let bh = (height as i32 - 76) / 5;
         for (row, btns) in buttons.iter().enumerate() {
             for (col, &btn) in btns.iter().enumerate() {
-                let bx = ax + 8 + col as i32 * (bw + 4);
-                let by = ay + 64 + row as i32 * (bh + 4);
+                let bx = 8 + col as i32 * (bw + 4);
+                let by = 64 + row as i32 * (bh + 4);
                 let is_op = "+-*/=".contains(btn);
                 let is_c = btn == 'C' || btn == '\x08';
                 let bg = if is_op { COLOR_ACCENT } else if is_c { 0xFFAA4444 } else { COLOR_HOVER };
@@ -172,11 +165,6 @@ impl CalcApp {
     }
 
     fn click_char(&mut self, x: i32, y: i32, width: u32, height: u32) {
-        let aw = 320i32.min(width as i32);
-        let ah = 400i32.min(height as i32);
-        let ax = (width as i32 - aw) / 2;
-        let ay = (height as i32 - ah) / 2;
-
         let buttons = [
             ['7', '8', '9', '/'],
             ['4', '5', '6', '*'],
@@ -185,12 +173,12 @@ impl CalcApp {
             ['(', ')', '\x08', '='],
         ];
 
-        let bw = (aw - 20) / 4;
-        let bh = (ah - 76) / 5;
+        let bw = (width as i32 - 20) / 4;
+        let bh = (height as i32 - 76) / 5;
         for (row, btns) in buttons.iter().enumerate() {
             for (col, &btn) in btns.iter().enumerate() {
-                let bx = ax + 8 + col as i32 * (bw + 4);
-                let by = ay + 64 + row as i32 * (bh + 4);
+                let bx = 8 + col as i32 * (bw + 4);
+                let by = 64 + row as i32 * (bh + 4);
                 if x >= bx && x < bx + bw && y >= by && y < by + bh {
                     if btn == '=' {
                         self.calculate();
@@ -206,15 +194,19 @@ impl CalcApp {
 
 fn main() -> std::io::Result<()> {
     let mut conn = LgpConnection::connect(LGP_CAP_CANVAS_SURFACE | LGP_CAP_KEYBOARD | LGP_CAP_POINTER)?;
-    let width = conn.output_width;
-    let height = conn.output_height;
+    let width = 320;
+    let height = 400;
 
     let mut surface = LgpSurface::create(
         &mut conn, LGP_SURFACE_CANVAS_SURFACE, 0, 0,
-        width, height, LGP_LAYER_SHELL, false,
+        width, height, LGP_LAYER_APPLICATION, true,
     )?;
 
+    conn.set_nonblocking(true)?;
+
     let mut app = CalcApp::new();
+    let mut cursor_x = (width / 2) as i32;
+    let mut cursor_y = (height / 2) as i32;
 
     loop {
         {
@@ -234,10 +226,16 @@ fn main() -> std::io::Result<()> {
         if (pfd.revents & POLLIN) != 0 {
             while let Ok(msg) = conn.recv() {
                 match msg.msg_type {
+                    t if t == LgpMessageType::PointerMotion as u16 => {
+                        if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                            cursor_x = ev.x as i32;
+                            cursor_y = ev.y as i32;
+                        }
+                    }
                     t if t == LgpMessageType::PointerButton as u16 => {
                         if let Some(ev) = parse_pointer_button(&msg.payload) {
                             if ev.pressed {
-                                app.click_char(ev.x as i32, ev.y as i32, width, height);
+                                app.click_char(cursor_x, cursor_y, width, height);
                             }
                         }
                     }

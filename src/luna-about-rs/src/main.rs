@@ -100,13 +100,15 @@ impl AboutApp {
 
 fn main() -> std::io::Result<()> {
     let mut conn = LgpConnection::connect(LGP_CAP_CANVAS_SURFACE | LGP_CAP_KEYBOARD)?;
-    let width = conn.output_width;
-    let height = conn.output_height;
+    let width = 360;
+    let height = 240;
 
     let mut surface = LgpSurface::create(
         &mut conn, LGP_SURFACE_CANVAS_SURFACE, 0, 0,
-        width, height, LGP_LAYER_SHELL, false,
+        width, height, LGP_LAYER_APPLICATION, true,
     )?;
+
+    conn.set_nonblocking(true)?;
 
     let app = AboutApp;
 

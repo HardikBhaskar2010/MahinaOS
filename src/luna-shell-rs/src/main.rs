@@ -1,149 +1,179 @@
+/*
+ * Copyright (c) 2026 Hardik Bhaskar
+ * Licensed under the MIT License.
+ *
+ * main.rs — Entry point for the MahinaOS Desktop Shell.
+ */
+
+mod keybinds;
+mod notifications;
+mod wallpaper;
+mod widgets;
+mod wm;
+mod lockscreen;
+mod taskbar;
+mod dock;
+mod launcher;
+mod shell;
+
 use std::os::unix::io::AsRawFd;
 use libc::{pollfd, poll, POLLIN};
 use lgp::connection::LgpConnection;
 use lgp::protocol::*;
 use lgp::surface::LgpSurface;
 use lgp::input::*;
-use lunagui::canvas::{draw_text_on_slice, fill_rect_on_slice};
+use crate::shell::ShellState;
 
-fn render_wallpaper(pixels: &mut [u8], stride: u32, width: u32, height: u32) {
-    for y in 0..height {
-        let t = y as f64 / height as f64;
-        let r = ((0.12 * (1.0 - t) + 0.08 * t) * 255.0) as u32;
-        let g = ((0.12 * (1.0 - t) + 0.08 * t) * 255.0) as u32;
-        let b = ((0.16 * (1.0 - t) + 0.10 * t) * 255.0) as u32;
-        let color = 0xFF000000 | (r << 16) | (g << 8) | b;
-        for x in 0..width {
-            let off = (y * stride + x * 4) as usize;
-            pixels[off..off + 4].copy_from_slice(&color.to_le_bytes());
-        }
-    }
-    let logo = "MahinaOS";
-    let cx = (width as i32 - logo.len() as i32 * 8) / 2;
-    let cy = height as i32 / 2 - 8;
-    draw_text_on_slice(pixels, stride, width, cx, cy, logo, 0xFF6B7FD4);
-}
+fn grab_wm_keys(conn: &mut LgpConnection) -> std::io::Result<()> {
+    use crate::keybinds::keys::*;
+    use lgp::protocol::{LGP_MOD_SUPER, LGP_MOD_SHIFT, LGP_MOD_CTRL, LGP_MOD_ALT};
 
-fn render_overlay(pixels: &mut [u8], stride: u32, width: u32, height: u32, clock_h: u8, clock_m: u8) {
-    const TOPBAR_H: u32 = 28;
-    const TOPBAR_COLOR: u32 = 0xEE0A0A14;
-    const ACCENT: u32 = 0xFFE03E8A;
-    const TEXT_COLOR: u32 = 0xFFD8D8E8;
-
-    fill_rect_on_slice(pixels, stride, width, height, 0, 0, width as i32, TOPBAR_H as i32, TOPBAR_COLOR);
-    fill_rect_on_slice(pixels, stride, width, height, 0, TOPBAR_H as i32 - 1, width as i32, 1, ACCENT);
-
-    draw_text_on_slice(pixels, stride, width, 8, 6, "MahinaOS", ACCENT);
-    draw_text_on_slice(pixels, stride, width, 8 + 7 * 8, 6, "|", TEXT_COLOR);
-
-    let ws = "[1]  2  3 ";
-    draw_text_on_slice(pixels, stride, width, 8 + 9 * 8, 6, ws, TEXT_COLOR);
-
-    let clock_str = format!("{:02}:{:02}", clock_h, clock_m);
-    let cx = width as i32 - clock_str.len() as i32 * 8 - 8;
-    draw_text_on_slice(pixels, stride, width, cx, 6, &clock_str, TEXT_COLOR);
-
-    const DOCK_H: u32 = 64;
-    const DOCK_BOTTOM: u32 = 4;
-    const DOCK_BG: u32 = 0xB008090E;
-
-    let dock_y = height - DOCK_H - DOCK_BOTTOM;
-    let dock_w = if width < 480 { width } else { 480 };
-    let dock_x = (width - dock_w) / 2;
-
-    fill_rect_on_slice(pixels, stride, width, height, dock_x as i32, dock_y as i32, dock_w as i32, DOCK_H as i32, DOCK_BG);
-
-    let apps = [
-        ("Settngs", 0xFFE03E8A),
-        ("Files", 0xFFD8D8E8),
-        ("Calc", 0xFFD8D8E8),
-        ("Text", 0xFFD8D8E8),
-        ("Tasks", 0xFFD8D8E8),
-        ("About", 0xFFD8D8E8),
+    // Grab all shortcut combinations we support
+    let keys_list = [
+        KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6,
+        KEY_Q, KEY_W, KEY_E, KEY_T, KEY_F, KEY_J, KEY_K, KEY_L, KEY_V,
+        KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_TAB, KEY_ENTER, KEY_SPACE,
+        KEY_ESC, KEY_BACKSPACE, KEY_0, KEY_9, KEY_8, KEY_7
     ];
 
-    let tile_w = dock_w / apps.len() as u32;
-    let tile_h = DOCK_H - 8;
-    let tile_base_y = dock_y + 4;
+    let modifiers = [
+        0,
+        LGP_MOD_SUPER,
+        LGP_MOD_SUPER | LGP_MOD_SHIFT,
+        LGP_MOD_SUPER | LGP_MOD_CTRL,
+        LGP_MOD_ALT,
+    ];
 
-    for (i, (name, tc)) in apps.iter().enumerate() {
-        let tx = dock_x + i as u32 * tile_w;
-        let nx = tx + tile_w / 2 - (name.len() as u32 * 4);
-        let ny = tile_base_y + tile_h / 2 - 8;
-        draw_text_on_slice(pixels, stride, width, nx as i32, ny as i32, name, *tc);
+    for &key in &keys_list {
+        for &mods in &modifiers {
+            let _ = lgp::wm::WmState::grab_key(conn, key, mods);
+        }
     }
+
+    Ok(())
 }
 
 fn main() -> std::io::Result<()> {
-    let caps = LGP_CAP_LAYER_SHELL | LGP_CAP_CANVAS_SURFACE | LGP_CAP_KEYBOARD | LGP_CAP_POINTER;
+    let caps = LGP_CAP_LAYER_SHELL
+        | LGP_CAP_CANVAS_SURFACE
+        | LGP_CAP_KEYBOARD
+        | LGP_CAP_POINTER
+        | LGP_CAP_WINDOW_MANAGER;
+
     let mut conn = LgpConnection::connect(caps)?;
+    let sw = conn.output_width;
+    let sh = conn.output_height;
 
-    let width = conn.output_width;
-    let height = conn.output_height;
+    // Grab shortcuts globally
+    grab_wm_keys(&mut conn)?;
 
+    // Create background wallpaper surface (layer 0, opaque XRGB)
     let mut wallpaper = LgpSurface::create(
-        &mut conn, LGP_SURFACE_CANVAS_SURFACE, 0, 0,
-        width, height, LGP_LAYER_WALLPAPER, false,
+        &mut conn,
+        LGP_SURFACE_CANVAS_SURFACE,
+        0, 0,
+        sw, sh,
+        LGP_LAYER_WALLPAPER,
+        false,
     )?;
 
+    // Create desktop UI overlay surface (layer 200, transparent ARGB)
     let mut overlay = LgpSurface::create(
-        &mut conn, LGP_SURFACE_SHELL_SURFACE, 0, 0,
-        width, height, LGP_LAYER_SHELL, true,
+        &mut conn,
+        LGP_SURFACE_SHELL_SURFACE,
+        0, 0,
+        sw, sh,
+        LGP_LAYER_SHELL,
+        true,
     )?;
 
-    let mut clock_h: u8 = 0;
-    let mut clock_m: u8 = 0;
-    let mut frame_count: u64 = 0;
+    let mut state = ShellState::new(sw, sh);
+
+    // Initial lock screen keyboard focus grab
+    let _ = lgp::wm::WmState::set_focus(&mut conn, overlay.id);
+
+    // Event loop polling variables
+    let mut pfd = pollfd {
+        fd: conn.as_raw_fd(),
+        events: POLLIN,
+        revents: 0,
+    };
+
+    // Shadow buffers to avoid flickering from direct LgpSurface writes
+    let mut wp_shadow = vec![0u8; (sw * sh * 4) as usize];
+    let mut ov_shadow = vec![0u8; (sw * sh * 4) as usize];
 
     loop {
-        let wp_pixels = wallpaper.pixels();
-        render_wallpaper(wp_pixels, width * 4, width, height);
+        // 1. Tick state (animations, stats updates, clock, child reaping)
+        state.tick(&mut conn);
+
+        // 2. Render and commit wallpaper
+        state.wallpaper.render(&mut wp_shadow, sw * 4);
+        wallpaper.pixels().copy_from_slice(&wp_shadow);
         wallpaper.commit(&mut conn)?;
 
-        let ov_pixels = overlay.pixels();
-        render_overlay(ov_pixels, width * 4, width, height, clock_h, clock_m);
+        // 3. Render and commit UI overlay
+        state.render_overlay(&mut ov_shadow, sw * 4);
+        overlay.pixels().copy_from_slice(&ov_shadow);
         overlay.commit(&mut conn)?;
 
-        frame_count += 1;
-        if frame_count % 10 == 0 {
-            clock_m = (clock_m + 1) % 60;
-            if clock_m == 0 {
-                clock_h = (clock_h + 1) % 24;
+        // 4. Poll LGP socket for input & WM events
+        // 33ms timeout targets ~30fps frame rate
+        let ret = unsafe { poll(&mut pfd, 1, 33) };
+        if ret < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::Interrupted {
+                continue;
             }
-        }
-
-        let mut pfd = pollfd {
-            fd: conn.as_raw_fd(),
-            events: POLLIN,
-            revents: 0,
-        };
-
-        loop {
-            let ret = unsafe { poll(&mut pfd, 1, 100) };
-            if ret < 0 {
-                if std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(std::io::Error::last_os_error());
-            }
-            break;
+            return Err(err);
         }
 
         if (pfd.revents & POLLIN) != 0 {
-            while let Ok(msg) = conn.recv() {
-                match msg.msg_type {
-                    t if t == LgpMessageType::KeyboardKey as u16 => {
-                        if let Some(ev) = parse_keyboard_key(&msg.payload) {
-                            if ev.key == 0x70029 && !ev.pressed {
-                                return Ok(()); // ESC quits
+            loop {
+                // Check if data is available before calling recv to avoid blocking
+                let mut pfd2 = pollfd {
+                    fd: conn.as_raw_fd(),
+                    events: POLLIN,
+                    revents: 0,
+                };
+                let ret2 = unsafe { poll(&mut pfd2, 1, 0) };
+                if ret2 <= 0 || (pfd2.revents & POLLIN) == 0 {
+                    break;
+                }
+
+                if let Ok(msg) = conn.recv() {
+                    match msg.msg_type {
+                        t if t == LgpMessageType::KeyboardKey as u16 => {
+                            if let Some(ev) = parse_keyboard_key(&msg.payload) {
+                                state.handle_keyboard(ev.key, ev.modifiers, ev.pressed, &mut conn);
                             }
                         }
+                        t if t == LgpMessageType::PointerMotion as u16 => {
+                            if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                                state.handle_pointer_motion(ev.x, ev.y, &mut conn);
+                            }
+                        }
+                        t if t == LgpMessageType::PointerButton as u16 => {
+                            if let Some(ev) = parse_pointer_button(&msg.payload) {
+                                state.handle_pointer_button(state.cursor_x, state.cursor_y, ev.button, ev.pressed, &mut conn);
+                            }
+                        }
+                        t if t == LgpMessageType::WmSurfaceCreated as u16 => {
+                            if let Some(info) = lgp::wm::WmState::parse_surface_created(&msg.payload) {
+                                state.wm.on_surface_created(info.surface_id, info.surface_type, info.width, info.height, &mut conn);
+                            }
+                        }
+                        t if t == LgpMessageType::WmSurfaceDestroyed as u16 => {
+                            if let Some(sid) = lgp::wm::WmState::parse_surface_destroyed(&msg.payload) {
+                                state.wm.on_surface_destroyed(sid, &mut conn);
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
+                } else {
+                    break;
                 }
             }
         }
     }
 }
-
-fn _launcher_hide() {}

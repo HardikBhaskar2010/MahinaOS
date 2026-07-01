@@ -31,6 +31,8 @@ pub struct App {
     pub height: u32,
     pub running: bool,
     pub handler: Option<Box<dyn AppHandler>>,
+    pub cursor_x: f64,
+    pub cursor_y: f64,
 }
 
 impl App {
@@ -45,6 +47,8 @@ impl App {
             height,
             running: true,
             handler: None,
+            cursor_x: (width / 2) as f64,
+            cursor_y: (height / 2) as f64,
         })
     }
 
@@ -109,6 +113,8 @@ impl App {
         match msg.msg_type {
             t if t == LgpMessageType::PointerMotion as u16 => {
                 if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                    self.cursor_x = ev.x;
+                    self.cursor_y = ev.y;
                     events.push(AppEvent::PointerMotion { x: ev.x, y: ev.y });
                     if let Some(ref mut handler) = self.handler {
                         handler.on_pointer_motion(ev.x, ev.y, &mut self.conn);
@@ -118,10 +124,10 @@ impl App {
             t if t == LgpMessageType::PointerButton as u16 => {
                 if let Some(ev) = parse_pointer_button(&msg.payload) {
                     events.push(AppEvent::PointerButton {
-                        x: ev.x, y: ev.y, button: ev.button, pressed: ev.pressed,
+                        x: self.cursor_x, y: self.cursor_y, button: ev.button, pressed: ev.pressed,
                     });
                     if let Some(ref mut handler) = self.handler {
-                        handler.on_pointer_button(ev.x, ev.y, ev.button, ev.pressed, &mut self.conn);
+                        handler.on_pointer_button(self.cursor_x, self.cursor_y, ev.button, ev.pressed, &mut self.conn);
                     }
                 }
             }

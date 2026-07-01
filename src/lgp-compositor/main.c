@@ -562,7 +562,7 @@ static bool lgp_handle_wm_set_focus(lgp_compositor_state_t *state, lgp_client_t 
     return true;
 }
 
-static bool lgp_handle_wm_set_state(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg) {
+static bool lgp_handle_wm_set_state(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg, drm_device_t *drm_dev) {
     if (!(client->caps_granted & LGP_CAP_WINDOW_MANAGER)) return false;
     lgp_wm_set_state_payload_t payload;
     if (!lgp_wm_decode_set_state(msg, &payload)) return false;
@@ -573,7 +573,7 @@ static bool lgp_handle_wm_set_state(lgp_compositor_state_t *state, lgp_client_t 
             break;
         }
     }
-    return true;
+    return lgp_repaint_surfaces(state, drm_dev);
 }
 
 static bool lgp_handle_wm_grab_key(lgp_compositor_state_t *state, lgp_client_t *client, const lgp_msg_t *msg) {
@@ -687,7 +687,7 @@ static bool lgp_handle_client_message(lgp_compositor_state_t *state,
         return lgp_handle_wm_set_focus(state, client, msg);
     }
     if (msg->type == LGP_MSG_WM_SET_STATE) {
-        return lgp_handle_wm_set_state(state, client, msg);
+        return lgp_handle_wm_set_state(state, client, msg, drm_dev);
     }
     if (msg->type == LGP_MSG_WM_GRAB_KEY) {
         return lgp_handle_wm_grab_key(state, client, msg);

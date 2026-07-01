@@ -22,18 +22,27 @@ pub const COLOR_DECO_FOCUSED: u32 = 0xFFE03E8A;
 pub const COLOR_DECO_BORDER: u32 = 0xFF5B3D78;
 
 pub fn alpha_blend(src: u32, dst: u32) -> u32 {
-    let a = (src >> 24) as u32;
-    if a == 255 { return src; }
-    if a == 0 { return dst | 0xFF000000; }
+    let src_a = (src >> 24) as u32;
+    if src_a == 255 { return src; }
+    if src_a == 0 { return dst; }
+
+    let dst_a = (dst >> 24) as u32;
+    if dst_a == 0 { return src; }
+
+    let out_a = src_a + (dst_a * (255 - src_a)) / 255;
+    if out_a == 0 { return 0; }
+
     let sr = (src >> 16) & 0xFF;
     let sg = (src >> 8) & 0xFF;
     let sb = src & 0xFF;
+
     let dr = (dst >> 16) & 0xFF;
     let dg = (dst >> 8) & 0xFF;
     let db = dst & 0xFF;
-    let inv = 255 - a;
-    let r = (sr * a + dr * inv) / 255;
-    let g = (sg * a + dg * inv) / 255;
-    let b = (sb * a + db * inv) / 255;
-    0xFF000000 | (r << 16) | (g << 8) | b
+
+    let r = (sr * src_a + (dr * dst_a * (255 - src_a)) / 255) / out_a;
+    let g = (sg * src_a + (dg * dst_a * (255 - src_a)) / 255) / out_a;
+    let b = (sb * src_a + (db * dst_a * (255 - src_a)) / 255) / out_a;
+
+    (out_a << 24) | (r << 16) | (g << 8) | b
 }

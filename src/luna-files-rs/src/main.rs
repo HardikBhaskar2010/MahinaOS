@@ -103,15 +103,18 @@ impl FilesApp {
 
 fn main() -> std::io::Result<()> {
     let mut conn = LgpConnection::connect(LGP_CAP_CANVAS_SURFACE | LGP_CAP_POINTER | LGP_CAP_KEYBOARD)?;
-    let width = conn.output_width;
-    let height = conn.output_height;
+    let width = 640;
+    let height = 480;
 
     let mut surface = LgpSurface::create(
         &mut conn, LGP_SURFACE_CANVAS_SURFACE, 0, 0,
-        width, height, LGP_LAYER_SHELL, false,
+        width, height, LGP_LAYER_APPLICATION, true,
     )?;
 
+    conn.set_nonblocking(true)?;
+
     let mut app = FilesApp::new();
+    let mut cursor_y = (height / 2) as i32;
 
     loop {
         {
@@ -131,10 +134,15 @@ fn main() -> std::io::Result<()> {
         if (pfd.revents & POLLIN) != 0 {
             while let Ok(msg) = conn.recv() {
                 match msg.msg_type {
+                    t if t == LgpMessageType::PointerMotion as u16 => {
+                        if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                            cursor_y = ev.y as i32;
+                        }
+                    }
                     t if t == LgpMessageType::PointerButton as u16 => {
                         if let Some(ev) = parse_pointer_button(&msg.payload) {
                             if ev.pressed {
-                                app.click_at(ev.y as i32);
+                                app.click_at(cursor_y);
                             }
                         }
                     }

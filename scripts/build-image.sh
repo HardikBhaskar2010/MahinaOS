@@ -80,9 +80,14 @@ fi
 if [ -f "${BUILD_DIR}/lgp-compositor/lgp-test-client" ]; then
     sudo cp "${BUILD_DIR}/lgp-compositor/lgp-test-client" "$MNT_ROOT/usr/bin/"
 fi
-if [ -f "${BUILD_DIR}/luna-shell/luna-shell" ]; then
-    sudo cp "${BUILD_DIR}/luna-shell/luna-shell" "$MNT_ROOT/usr/bin/"
+if [ -f "${BUILD_DIR}/rust/luna-shell" ]; then
+    sudo cp "${BUILD_DIR}/rust/luna-shell" "$MNT_ROOT/usr/bin/"
 fi
+for rs_app in settings files calc tasks about text; do
+    if [ -f "${BUILD_DIR}/rust/${rs_app}-rs" ]; then
+        sudo cp "${BUILD_DIR}/rust/${rs_app}-rs" "$MNT_ROOT/usr/bin/"
+    fi
+done
 if [ -f "${BUILD_DIR}/luna-terminal/luna-terminal" ]; then
     sudo cp "${BUILD_DIR}/luna-terminal/luna-terminal" "$MNT_ROOT/usr/bin/"
 fi
