@@ -203,25 +203,8 @@ static void on_timer(int fd, void *user_data) {
         lgui_window_update(shell.wallpaper_win);
     }
 
-    /* Redraw overlay into canvas via helper */
+    /* Redraw overlay via widget tree callback */
     if (shell.overlay_win) {
-        lgui_canvas_t *oc = lgui_window_get_canvas(shell.overlay_win);
-        if (oc) {
-            uint32_t sw = shell.screen_w;
-            uint32_t sh = shell.screen_h;
-
-            /* Clear to transparent so shell composites over wallpaper */
-            lgui_canvas_fill_rect(oc, 0, 0, (int)sw, (int)sh, 0x00000000u);
-
-            /* Top panel */
-            topbar_render(&shell.tb, oc, sw);
-
-            /* Left dock */
-            dock_render(&shell.dk, oc, sh);
-
-            /* Window decorations */
-            deco_render(&shell.dc, oc);
-        }
         lgui_window_update(shell.overlay_win);
     }
 }

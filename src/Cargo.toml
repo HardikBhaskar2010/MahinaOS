@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = [
+    "lgp-rs",
+    "lunagui-rs",
+    "luna-shell-rs",
+    "luna-settings-rs",
+    "luna-files-rs",
+    "luna-calc-rs",
+    "luna-text-rs",
+    "luna-tasks-rs",
+    "luna-about-rs",
+]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = "thin"
+strip = true

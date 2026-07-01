@@ -98,6 +98,8 @@ static void lgp_input_update_modifiers(uint32_t code, bool pressed) {
     }
 }
 
+#ifdef LGP_HAVE_LIBINPUT
+
 static uint8_t lgp_input_button_from_evdev(uint32_t button) {
     if (button == BTN_LEFT) {
         return 0u;
@@ -110,8 +112,6 @@ static uint8_t lgp_input_button_from_evdev(uint32_t button) {
     }
     return 3u;
 }
-
-#ifdef LGP_HAVE_LIBINPUT
 
 #include <libinput.h>
 #include <libudev.h>

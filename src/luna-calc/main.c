@@ -1,28 +1,7 @@
 /*
  * Copyright (c) 2026 Hardik Bhaskar
- *
  * Licensed under the MIT License.
  * See the LICENSE file for details.
- */
-
-/*
- * luna-calc — MahinaOS calculator application.
- *
- * Implements a 4-function calculator with expression evaluation.
- * No external math libraries — uses integer arithmetic with double conversion
- * for display, all in pure C.
- *
- * Layout (320 × 400 window):
- *
- *   ┌─────────────────────────┐
- *   │  Display: 0             │
- *   ├────┬────┬────┬──────────┤
- *   │ 7  │ 8  │ 9  │   ÷     │
- *   │ 4  │ 5  │ 6  │   ×     │
- *   │ 1  │ 2  │ 3  │   −     │
- *   │ 0  │ .  │ =  │   +     │
- *   │ C  │ ←  │    │         │
- *   └─────────────────────────┘
  */
 
 #include "lunagui.h"
@@ -31,204 +10,240 @@
 #include <string.h>
 #include <math.h>
 
-/* ── Calculator state ────────────────────────────────────────────────────── */
+#define WIN_W 320
+#define WIN_H 420
 
-static lgui_application_t *g_app = NULL;
-static lgui_window_t      *g_win = NULL;
-static lgui_widget_t      *g_root = NULL;
-static lgui_widget_t      *g_display = NULL;  /* Label showing current input */
+#define COL_BG     0xFF12121Cu
+#define COL_DISP   0xFF1E1E28u
+#define COL_ACCENT 0xFF00D4FFu
+#define COL_TEXT   0xFFEEEEF4u
+#define COL_DIM   0xFF9898AAu
+#define COL_BTN   0xFF262636u
+#define COL_BTNOP 0xFF7B2FBEu
+#define COL_BTNEQ 0xFF00FF88u
+#define COL_BTNC  0xFFFF2D78u
+#define COL_BORDER 0xFF303044u
 
-static char   g_display_text[128] = "0";
-static double g_accumulator = 0.0;
-static char   g_pending_op  = 0;
-static bool   g_new_input   = true;
+#define MAX_CLICK 20
+static struct { int x,y,w,h; int action; } g_zones[MAX_CLICK];
+static int g_zone_count = 0;
 
-/* ── Display update ───────────────────────────────────────────────────────── */
+static char g_display[64] = "0";
+static double g_accum = 0;
+static int g_pending_op = 0; /* 0=none, 1=+, 2=-, 3=*, 4=/ */
+static bool g_new_input = true;
+static bool g_error = false;
 
-static void update_display(void) {
-    if (g_display) {
-        lgui_label_set_text(g_display, g_display_text);
-        /* Mark window dirty for re-render */
-        if (g_win) lgui_window_update(g_win);
+static void add_zone(int x,int y,int w,int h,int a){
+    if(g_zone_count<MAX_CLICK){
+        g_zones[g_zone_count].x = x;
+        g_zones[g_zone_count].y = y;
+        g_zones[g_zone_count].w = w;
+        g_zones[g_zone_count].h = h;
+        g_zones[g_zone_count].action = a;
+        g_zone_count++;
     }
 }
 
-/* ── Calculator logic ─────────────────────────────────────────────────────── */
+enum { ACT_0,ACT_1,ACT_2,ACT_3,ACT_4,ACT_5,ACT_6,ACT_7,ACT_8,ACT_9,
+       ACT_DOT,ACT_ADD,ACT_SUB,ACT_MUL,ACT_DIV,ACT_EQ,ACT_CLR,ACT_BS,ACT_NEG,ACT_PCT };
 
-static void apply_op(char op, double a, double b, double *result) {
-    switch (op) {
-        case '+': *result = a + b; break;
-        case '-': *result = a - b; break;
-        case '*': *result = a * b; break;
-        case '/': *result = (b != 0.0) ? a / b : 0.0; break;
-        default:  *result = b; break;
-    }
-}
-
-static void press_digit(char digit) {
-    if (g_new_input) {
-        g_display_text[0] = digit;
-        g_display_text[1] = '\0';
-        g_new_input = false;
+static void input_digit(int d) {
+    if (g_error) { strcpy(g_display, "0"); g_error = false; g_new_input = true; }
+    if (g_new_input) { strcpy(g_display, "0"); g_new_input = false; }
+    if (strcmp(g_display, "0") == 0) {
+        snprintf(g_display, sizeof(g_display), "%d", d);
     } else {
-        size_t len = strlen(g_display_text);
-        if (len < 20) {
-            /* Prevent multiple decimal points */
-            if (digit == '.' && strchr(g_display_text, '.')) return;
-            g_display_text[len]     = digit;
-            g_display_text[len + 1] = '\0';
+        char tmp[64];
+        snprintf(tmp, sizeof(tmp), "%s%d", g_display, d);
+        strncpy(g_display, tmp, sizeof(g_display) - 1);
+    }
+}
+
+static void input_dot(void) {
+    if (g_new_input) { strcpy(g_display, "0."); g_new_input = false; return; }
+    if (!strchr(g_display, '.')) {
+        strcat(g_display, ".");
+    }
+}
+
+static void do_op(int op) {
+    if (g_error) return;
+    double val = atof(g_display);
+    if (g_pending_op && !g_new_input) {
+        switch (g_pending_op) {
+            case 1: g_accum += val; break;
+            case 2: g_accum -= val; break;
+            case 3: g_accum *= val; break;
+            case 4:
+                if (val == 0.0) {
+                    snprintf(g_display, sizeof(g_display), "Error");
+                    g_error = true; g_pending_op = 0; g_new_input = true;
+                    return;
+                }
+                g_accum /= val; break;
         }
-    }
-    update_display();
-}
-
-static void press_op(char op) {
-    double current = atof(g_display_text);
-    if (g_pending_op) {
-        apply_op(g_pending_op, g_accumulator, current, &g_accumulator);
-        snprintf(g_display_text, sizeof(g_display_text),
-                 "%g", g_accumulator);
-        update_display();
+        snprintf(g_display, sizeof(g_display), "%g", g_accum);
     } else {
-        g_accumulator = current;
+        g_accum = val;
     }
     g_pending_op = op;
-    g_new_input  = true;
+    g_new_input = true;
 }
 
-static void press_equals(void) {
-    double current = atof(g_display_text);
-    if (g_pending_op) {
-        apply_op(g_pending_op, g_accumulator, current, &g_accumulator);
-        snprintf(g_display_text, sizeof(g_display_text),
-                 "%g", g_accumulator);
-        update_display();
-        g_pending_op = 0;
-        g_new_input  = true;
+static void do_equals(void) {
+    if (g_error || !g_pending_op) return;
+    double val = atof(g_display);
+    switch (g_pending_op) {
+        case 1: g_accum += val; break;
+        case 2: g_accum -= val; break;
+        case 3: g_accum *= val; break;
+        case 4:
+            if (val == 0.0) {
+                snprintf(g_display, sizeof(g_display), "Error");
+                g_error = true; g_pending_op = 0; g_new_input = true;
+                return;
+            }
+            g_accum /= val; break;
+    }
+    snprintf(g_display, sizeof(g_display), "%g", g_accum);
+    g_pending_op = 0;
+    g_new_input = true;
+}
+
+static void do_action(int a) {
+    switch (a) {
+        case ACT_0: case ACT_1: case ACT_2: case ACT_3: case ACT_4:
+        case ACT_5: case ACT_6: case ACT_7: case ACT_8: case ACT_9:
+            input_digit(a - ACT_0); break;
+        case ACT_DOT: input_dot(); break;
+        case ACT_ADD: do_op(1); break;
+        case ACT_SUB: do_op(2); break;
+        case ACT_MUL: do_op(3); break;
+        case ACT_DIV: do_op(4); break;
+        case ACT_EQ: do_equals(); break;
+        case ACT_CLR:
+            strcpy(g_display, "0"); g_accum = 0; g_pending_op = 0;
+            g_new_input = true; g_error = false; break;
+        case ACT_BS:
+            if (!g_new_input && strlen(g_display) > 1) {
+                g_display[strlen(g_display)-1] = '\0';
+            } else {
+                strcpy(g_display, "0"); g_new_input = true;
+            }
+            break;
+        case ACT_NEG: {
+            double v = atof(g_display);
+            snprintf(g_display, sizeof(g_display), "%g", -v);
+            break;
+        }
+        case ACT_PCT: {
+            double v = atof(g_display);
+            snprintf(g_display, sizeof(g_display), "%g", v / 100.0);
+            break;
+        }
     }
 }
 
-static void press_clear(void) {
-    strcpy(g_display_text, "0");
-    g_accumulator = 0.0;
-    g_pending_op  = 0;
-    g_new_input   = true;
-    update_display();
-}
-
-static void press_backspace(void) {
-    size_t len = strlen(g_display_text);
-    if (len > 1) {
-        g_display_text[len - 1] = '\0';
-    } else {
-        strcpy(g_display_text, "0");
-        g_new_input = true;
-    }
-    update_display();
-}
-
-/* ── Button callbacks ─────────────────────────────────────────────────────── */
-
-/* user_data is a char* pointing to a static string of length 1 */
-static void digit_cb(lgui_widget_t *b, void *u) {
-    (void)b;
-    press_digit(((char *)u)[0]);
-}
-
-static void op_cb(lgui_widget_t *b, void *u) {
-    (void)b;
-    press_op(((char *)u)[0]);
-}
-
-static void eq_cb(lgui_widget_t *b, void *u)   { (void)b;(void)u; press_equals();    }
-static void cl_cb(lgui_widget_t *b, void *u)   { (void)b;(void)u; press_clear();     }
-static void bs_cb(lgui_widget_t *b, void *u)   { (void)b;(void)u; press_backspace(); }
-
-/* ── Static key data (avoids dangling pointers in callbacks) ─────────────── */
-
-static const char k_0 = '0', k_1 = '1', k_2 = '2', k_3 = '3', k_4 = '4';
-static const char k_5 = '5', k_6 = '6', k_7 = '7', k_8 = '8', k_9 = '9';
-static const char k_dot = '.';
-static const char k_plus = '+', k_minus = '-', k_mul = '*', k_div = '/';
-
-static lgui_widget_t *make_btn(const char *label, lgui_button_click_cb cb, const void *data) {
-    lgui_widget_t *b = lgui_button_create(label);
-    lgui_widget_set_size(b, 72, 40);
-    lgui_button_set_on_click(b, cb, (void *)(uintptr_t)data);
-    return b;
-}
-
-/* ── Build UI ─────────────────────────────────────────────────────────────── */
-
-static lgui_widget_t *build_calc_ui(void) {
-    lgui_widget_t *vbox = lgui_vbox_create();
-    lgui_widget_set_size(vbox, 320, 400);
+static void calc_render(lgui_widget_t *w, lgui_canvas_t *c, int x, int y) {
+    (void)w; g_zone_count = 0;
+    lgui_canvas_push_clip(c, x, y, WIN_W, WIN_H);
+    lgui_canvas_fill_rect(c, 0, 0, WIN_W, WIN_H, COL_BG);
 
     /* Display */
-    g_display = lgui_label_create(g_display_text);
-    lgui_widget_set_size(g_display, 300, 32);
-    lgui_box_add_child(vbox, g_display);
+    lgui_canvas_fill_rect(c, 12, 12, WIN_W-24, 48, COL_DISP);
+    lgui_canvas_draw_rect_outline(c, 12, 12, WIN_W-24, 48, COL_BORDER);
+    /* Right-align display text */
+    int tw = (int)strlen(g_display) * 8;
+    int dx = WIN_W - 24 - tw - 8;
+    if (dx < 16) dx = 16;
+    lgui_canvas_draw_text(c, dx, 28, g_display, COL_TEXT);
 
-    /* Row: 7 8 9 ÷ */
-    lgui_widget_t *r1 = lgui_hbox_create();
-    lgui_widget_set_size(r1, 320, 44);
-    lgui_box_add_child(r1, make_btn("7", digit_cb, &k_7));
-    lgui_box_add_child(r1, make_btn("8", digit_cb, &k_8));
-    lgui_box_add_child(r1, make_btn("9", digit_cb, &k_9));
-    lgui_box_add_child(r1, make_btn("÷", op_cb, &k_div));
-    lgui_box_add_child(vbox, r1);
+    /* Pending operation indicator */
+    if (g_pending_op && !g_new_input) {
+        const char *ops[] = {"", "+", "-", "x", "/"};
+        lgui_canvas_fill_rect(c, WIN_W-36, 14, 20, 14, COL_BTNOP);
+        lgui_canvas_draw_text(c, WIN_W-32, 16, ops[g_pending_op], COL_TEXT);
+    }
 
-    /* Row: 4 5 6 × */
-    lgui_widget_t *r2 = lgui_hbox_create();
-    lgui_widget_set_size(r2, 320, 44);
-    lgui_box_add_child(r2, make_btn("4", digit_cb, &k_4));
-    lgui_box_add_child(r2, make_btn("5", digit_cb, &k_5));
-    lgui_box_add_child(r2, make_btn("6", digit_cb, &k_6));
-    lgui_box_add_child(r2, make_btn("×", op_cb, &k_mul));
-    lgui_box_add_child(vbox, r2);
+    /* Button grid: 5 rows x 4 cols */
+    int bw = 66, bh = 52, gap = 6;
+    int sx = 16, sy = 68;
 
-    /* Row: 1 2 3 − */
-    lgui_widget_t *r3 = lgui_hbox_create();
-    lgui_widget_set_size(r3, 320, 44);
-    lgui_box_add_child(r3, make_btn("1", digit_cb, &k_1));
-    lgui_box_add_child(r3, make_btn("2", digit_cb, &k_2));
-    lgui_box_add_child(r3, make_btn("3", digit_cb, &k_3));
-    lgui_box_add_child(r3, make_btn("−", op_cb, &k_minus));
-    lgui_box_add_child(vbox, r3);
+    /* Row 1: C, +/-, %, / */
+    struct { const char *t; int act; int col; } btns[] = {
+        {"C",  ACT_CLR,  COL_BTNC}, {"+/-", ACT_NEG, COL_BTN}, {"%", ACT_PCT, COL_BTN}, {"/", ACT_DIV, COL_BTNOP},
+        {"7",  ACT_7,    COL_BTN},  {"8",  ACT_8,   COL_BTN},  {"9", ACT_9, COL_BTN},   {"x", ACT_MUL, COL_BTNOP},
+        {"4",  ACT_4,    COL_BTN},  {"5",  ACT_5,   COL_BTN},  {"6", ACT_6, COL_BTN},   {"-", ACT_SUB, COL_BTNOP},
+        {"1",  ACT_1,    COL_BTN},  {"2",  ACT_2,   COL_BTN},  {"3", ACT_3, COL_BTN},   {"+", ACT_ADD, COL_BTNOP},
+        {"0",  ACT_0,    COL_BTN},  {".",  ACT_DOT, COL_BTN},  {" ", -1,     COL_BTN},   {"=", ACT_EQ, COL_BTNEQ},
+    };
 
-    /* Row: 0 . = + */
-    lgui_widget_t *r4 = lgui_hbox_create();
-    lgui_widget_set_size(r4, 320, 44);
-    lgui_box_add_child(r4, make_btn("0", digit_cb, &k_0));
-    lgui_box_add_child(r4, make_btn(".", digit_cb, &k_dot));
-    lgui_box_add_child(r4, make_btn("=", eq_cb, NULL));
-    lgui_box_add_child(r4, make_btn("+", op_cb, &k_plus));
-    lgui_box_add_child(vbox, r4);
+    for (int i = 0; i < 20; i++) {
+        int row = i / 4, col = i % 4;
+        int bx = sx + col * (bw + gap);
+        int by = sy + row * (bh + gap);
+        uint32_t bg = btns[i].col;
 
-    /* Row: C ← (1 and 2) */
-    lgui_widget_t *r5 = lgui_hbox_create();
-    lgui_widget_set_size(r5, 320, 44);
-    lgui_box_add_child(r5, make_btn("C", cl_cb, NULL));
-    lgui_box_add_child(r5, make_btn("←", bs_cb, NULL));
-    lgui_box_add_child(vbox, r5);
+        lgui_canvas_fill_rect(c, bx, by, bw, bh, bg);
+        lgui_canvas_draw_rect_outline(c, bx, by, bw, bh, COL_BORDER);
 
-    return vbox;
+        if (btns[i].act >= 0) {
+            lgui_canvas_draw_text(c, bx + (bw - (int)strlen(btns[i].t)*8)/2,
+                                   by + (bh - 16)/2, btns[i].t, COL_TEXT);
+            add_zone(bx, by, bw, bh, btns[i].act);
+        }
+    }
+
+    lgui_canvas_pop_clip(c);
 }
 
-/* ── Entry point ──────────────────────────────────────────────────────────── */
+static void on_pointer(int mx, int my, bool pressed, bool is_btn, void *ud) {
+    (void)ud;
+    if (!pressed || !is_btn) return;
+    for (int i = 0; i < g_zone_count; i++) {
+        if (mx >= g_zones[i].x && mx < g_zones[i].x + g_zones[i].w &&
+            my >= g_zones[i].y && my < g_zones[i].y + g_zones[i].h) {
+            do_action(g_zones[i].action);
+            return;
+        }
+    }
+}
+
+static void on_key(lgui_widget_t *w, uint32_t key, uint32_t mods, void *ud) {
+    (void)w; (void)ud; (void)mods;
+    char c = lgui_keymap_translate(key, mods);
+    if (c >= '0' && c <= '9') input_digit(c - '0');
+    else if (c == '.') input_dot();
+    else if (c == '+') do_op(1);
+    else if (c == '-') do_op(2);
+    else if (c == '*') do_op(3);
+    else if (c == '/') do_op(4);
+    else if (c == '=' || c == '\n') do_equals();
+    else if (c == '\x1b') { /* Esc = Clear */
+        strcpy(g_display, "0"); g_accum = 0; g_pending_op = 0;
+        g_new_input = true; g_error = false;
+    }
+    else if (c == '\x08') do_action(ACT_BS); /* Backspace */
+}
 
 int main(void) {
-    g_app = lgui_application_create("luna-calc");
-    if (!g_app) return 1;
+    lgui_application_t *app = lgui_application_create("luna-calc");
+    if (!app) return 1;
 
-    g_win = lgui_window_create(g_app, 320, 400, LGUI_LAYER_APPLICATION);
-    if (!g_win) { lgui_application_destroy(g_app); return 1; }
+    lgui_window_t *win = lgui_window_create(app, WIN_W, WIN_H, LGUI_LAYER_APPLICATION);
+    if (!win) { lgui_application_destroy(app); return 1; }
 
-    g_root = build_calc_ui();
-    lgui_window_set_root_widget(g_win, g_root);
-    lgui_window_show(g_win);
+    lgui_widget_t *cw = lgui_canvas_widget_create();
+    lgui_widget_set_size(cw, WIN_W, WIN_H);
+    lgui_canvas_widget_set_render(cw, calc_render);
+    lgui_window_set_root_widget(win, cw);
+    lgui_window_show(win);
 
-    lgui_application_run(g_app);
-    lgui_application_destroy(g_app);
+    lgui_application_set_global_pointer_cb(app, on_pointer, NULL);
+    lgui_widget_set_on_key(cw, on_key, NULL);
+
+    lgui_application_run(app);
+    lgui_application_destroy(app);
     return 0;
 }

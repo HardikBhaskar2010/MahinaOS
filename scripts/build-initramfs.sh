@@ -60,6 +60,28 @@ binaries=(
     "luna-splash/luna-splash"
 )
 
+# Rust application binaries
+rust_binaries=(
+    "rust/luna-shell"
+    "rust/settings-rs"
+    "rust/files-rs"
+    "rust/calc-rs"
+    "rust/text-rs"
+    "rust/tasks-rs"
+    "rust/about-rs"
+)
+
+for b in "${rust_binaries[@]}"; do
+    name=$(basename "$b")
+    src="${BUILD_DIR}/${b}"
+    if [ -f "${src}" ]; then
+        cp "${src}" "${INITRAMFS_DIR}/usr/bin/"
+        chmod +x "${INITRAMFS_DIR}/usr/bin/${name}"
+    else
+        echo "WARNING: Rust binary ${name} not found at ${src}. Skipping."
+    fi
+done
+
 for b in "${binaries[@]}"; do
     name=$(basename "$b")
     src="${BUILD_DIR}/${b}"

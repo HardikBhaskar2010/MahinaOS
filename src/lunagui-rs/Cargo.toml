@@ -1,0 +1,13 @@
+[package]
+name = "lunagui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "lunagui"
+crate-type = ["lib"]
+
+[dependencies]
+lgp = { path = "../lgp-rs" }
+libc = "0.2"

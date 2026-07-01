@@ -104,3 +104,23 @@ void lgui_canvas_draw_text(lgui_canvas_t *canvas, int x, int y, const char *text
     if (!canvas || !canvas->pixels) return;
     lgui_font_draw_text(canvas, x, y, text, color);
 }
+
+void lgui_canvas_draw_text_len(lgui_canvas_t *canvas, int x, int y,
+                                const char *text, int max_chars, uint32_t color) {
+    if (!canvas || !canvas->pixels || !text) return;
+    char buf[256];
+    int len = 0;
+    while (text[len] && len < max_chars && len < 255) {
+        buf[len] = text[len];
+        len++;
+    }
+    buf[len] = '\0';
+    lgui_font_draw_text(canvas, x, y, buf, color);
+}
+
+int lgui_canvas_text_width(const char *text, int max_chars) {
+    if (!text) return 0;
+    int len = 0;
+    while (text[len] && len < max_chars) len++;
+    return len * 8; /* 8px per glyph */
+}

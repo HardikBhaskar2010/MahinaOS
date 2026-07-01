@@ -22,6 +22,7 @@
 #include "lunagui.h"
 #include "widget_private.h"
 #include "lgui_private.h"
+#include <string.h>
 
 /* ── Mahina Design System Color Palette ────────────────────────────────────── */
 
@@ -126,6 +127,63 @@ static void render_button(lgui_canvas_t *canvas, const lgui_widget_t *w,
     lgui_canvas_draw_text(canvas, text_x, text_y, w->text, MAHINA_TEXT_PRIMARY);
 }
 
+/* Mahina Design System colors for TextField */
+#define MAHINA_BG_INPUT      0xFF14141Eu  /* Dark input field background */
+#define MAHINA_BORDER_FOCUSED 0xFF00D4FFu  /* LUNA Blue focus border */
+#define MAHINA_TEXT_CURSOR    0xFF00D4FFu  /* LUNA Blue cursor */
+
+static void render_textfield(lgui_canvas_t *canvas, const lgui_widget_t *w,
+                              int cx, int cy) {
+    /* Input background */
+    lgui_canvas_fill_rect(canvas, cx, cy, w->width, w->height, MAHINA_BG_INPUT);
+
+    /* Border */
+    uint32_t border_color = w->focused ? MAHINA_BORDER_FOCUSED : MAHINA_BORDER_SUBTLE;
+    lgui_canvas_draw_rect_outline(canvas, cx, cy, w->width, w->height, border_color);
+
+    /* Text or placeholder */
+    int text_x = cx + 8;
+    int text_y = cy + (w->height - 16) / 2;
+
+    if (w->text_len > 0) {
+        /* Render visible portion of text (scroll if needed) */
+        int char_width = 8;
+        int max_chars = (w->width - 16) / char_width;
+        int start = w->view_offset;
+        int len = w->text_len - start;
+        if (len > max_chars) len = max_chars;
+
+        if (w->password_mode) {
+            char dots[64];
+            int dlen = len < 63 ? len : 63;
+            memset(dots, '*', (size_t)dlen);
+            dots[dlen] = '\0';
+            lgui_canvas_draw_text(canvas, text_x, text_y, dots, MAHINA_TEXT_PRIMARY);
+        } else {
+            char visible[256];
+            int vlen = len < 255 ? len : 255;
+            memcpy(visible, w->text + start, (size_t)vlen);
+            visible[vlen] = '\0';
+            lgui_canvas_draw_text(canvas, text_x, text_y, visible, MAHINA_TEXT_PRIMARY);
+        }
+
+        /* Cursor line */
+        if (w->focused) {
+            int cursor_x = text_x + (w->cursor_pos - start) * char_width;
+            lgui_canvas_fill_rect(canvas, cursor_x, cy + 4, 2, w->height - 8,
+                                   MAHINA_TEXT_CURSOR);
+        }
+    } else if (!w->focused) {
+        /* Placeholder text */
+        lgui_canvas_draw_text(canvas, text_x, text_y, w->placeholder,
+                               MAHINA_TEXT_DISABLED);
+    } else if (w->focused) {
+        /* Empty focused field - show cursor */
+        lgui_canvas_fill_rect(canvas, text_x, cy + 4, 2, w->height - 8,
+                               MAHINA_TEXT_CURSOR);
+    }
+}
+
 /* ── Main recursive renderer ──────────────────────────────────────────────── */
 
 void lgui_widget_render(lgui_canvas_t *canvas, lgui_widget_t *w,
@@ -141,6 +199,9 @@ void lgui_widget_render(lgui_canvas_t *canvas, lgui_widget_t *w,
             break;
         case 2: /* Button */
             render_button(canvas, w, cx, cy);
+            break;
+        case 7: /* TextField */
+            render_textfield(canvas, w, cx, cy);
             break;
         case 3: /* VBox */
             layout_vbox(w);

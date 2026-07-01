@@ -188,7 +188,7 @@ LUNA_GUI_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint verify help
 
-all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-shell luna-desktop luna-installer luna-terminal luna-settings luna-files luna-calc luna-text luna-about luna-tasks build/live.lraw
+all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-shell luna-desktop luna-installer luna-terminal luna-settings luna-files luna-calc luna-text luna-about luna-tasks rust-apps build/live.lraw
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -261,6 +261,53 @@ $(BUILD_DIR)/luna-splash/luna-splash: $(LUNA_SPLASH_OBJECTS) | $(BUILD_DIR)/luna
 $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 	@echo "  CC      $<"
 	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -c -o $@ $<
+
+# ---------------------------------------------------------------------------
+# Rust applications (cross-compiled via cargo in WSL)
+# ---------------------------------------------------------------------------
+
+RUST_SRC_DIR := $(SRC_DIR)
+RUST_TARGET_DIR := $(RUST_SRC_DIR)/target/x86_64-unknown-linux-musl/release
+RUST_BINARIES := luna-shell settings-rs files-rs calc-rs text-rs tasks-rs about-rs
+RUST_BIN_DIRS  := luna-shell-rs luna-settings-rs luna-files-rs luna-calc-rs luna-text-rs luna-tasks-rs luna-about-rs
+
+.PHONY: rust-apps rust-clean
+rust-apps: $(addprefix $(BUILD_DIR)/rust/,$(RUST_BINARIES))
+
+CARGO_BUILD_CMD := cd "$(RUST_SRC_DIR)" && . $$HOME/.cargo/env && RUSTFLAGS="-C target-feature=+crt-static" cargo build --release
+
+$(RUST_TARGET_DIR)/luna-shell: $(wildcard $(RUST_SRC_DIR)/lgp-rs/src/*.rs) $(wildcard $(RUST_SRC_DIR)/lunagui-rs/src/*.rs) $(wildcard $(RUST_SRC_DIR)/luna-shell-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-shell-rs
+
+$(RUST_TARGET_DIR)/settings-rs: $(wildcard $(RUST_SRC_DIR)/luna-settings-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-settings-rs
+
+$(RUST_TARGET_DIR)/files-rs: $(wildcard $(RUST_SRC_DIR)/luna-files-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-files-rs
+
+$(RUST_TARGET_DIR)/calc-rs: $(wildcard $(RUST_SRC_DIR)/luna-calc-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-calc-rs
+
+$(RUST_TARGET_DIR)/text-rs: $(wildcard $(RUST_SRC_DIR)/luna-text-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-text-rs
+
+$(RUST_TARGET_DIR)/tasks-rs: $(wildcard $(RUST_SRC_DIR)/luna-tasks-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-tasks-rs
+
+$(RUST_TARGET_DIR)/about-rs: $(wildcard $(RUST_SRC_DIR)/luna-about-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-about-rs
+
+$(BUILD_DIR)/rust/%: $(RUST_TARGET_DIR)/% | $(BUILD_DIR)/rust
+	@echo "  RUSTCP  $@"
+	cp $< $@
+	$(STRIP) $@
+
+$(BUILD_DIR)/rust:
+	mkdir -p $@
+
+rust-clean:
+	cd "$(RUST_SRC_DIR)" && cargo clean 2>/dev/null || true
+	rm -rf $(BUILD_DIR)/rust
 
 # ---------------------------------------------------------------------------
 # Disk image (requires Linux / WSL2 — uses loopback devices)
@@ -453,6 +500,7 @@ $(BUILD_DIR)/tests/vendor:
 clean:
 	@echo "  CLEAN   Removing build artifacts"
 	rm -rf $(BUILD_DIR)
+	cd "$(RUST_SRC_DIR)" && cargo clean 2>/dev/null || true
 	@echo "  CLEAN   Done"
 
 # ---------------------------------------------------------------------------

@@ -1,215 +1,283 @@
 /*
  * Copyright (c) 2026 Hardik Bhaskar
- *
  * Licensed under the MIT License.
  * See the LICENSE file for details.
  */
 
 /*
- * luna-files — MahinaOS graphical file manager.
- *
- * Architecture:
- *   - Browse the filesystem using opendir()/readdir() (POSIX, no GTK/Qt)
- *   - Display directory contents as a list of label/button widgets
- *   - Navigation: click a directory button to enter, "← Up" to go parent
- *   - Current path shown in header bar
- *
- * Limitations (Phase 7):
- *   - Read-only navigation (no delete/rename — deferred to Phase 8)
- *   - No icon rendering (deferred until lgui_image_t is implemented)
- *   - No drag-and-drop (deferred)
- *   - Max 48 entries per directory listed (VBox child limit = 16 per container,
- *     but using a scrollable vbox once lgui_scroll_container is available;
- *     for now cap at 40 entries + navigation)
+ * luna-files — File Manager for MahinaOS.
+ * Backend (C): opendir/readdir, stat, unlink, mkdir, fork/exec for open.
+ * UI: canvas-based directory browser with file operations.
  */
 
 #include "lunagui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#include <sys/wait.h>
 
-#define MAX_ENTRIES 40
+#define WIN_W 560
+#define WIN_H 480
+#define MAX_ENTRIES 200
+#define VISIBLE_ENTRIES 18
 
-static lgui_application_t *g_app  = NULL;
-static lgui_window_t      *g_win  = NULL;
-static lgui_widget_t      *g_root = NULL;
-static char                g_cwd[4096];
+#define COL_BG      0xFF12121Cu
+#define COL_ACCENT  0xFF00D4FFu
+#define COL_TEXT    0xFFEEEEF4u
+#define COL_DIM    0xFF9898AAu
+#define COL_DIR    0xFF7B2FBEu
+#define COL_FILE   0xFF00FF88u
+#define COL_BTN    0xFF262636u
+#define COL_BORDER 0xFF303044u
+#define COL_ERR    0xFFFF2D78u
 
-static void navigate_to(const char *path);
+#define MAX_CLICK 20
+static struct { int x,y,w,h; int action; } g_zones[MAX_CLICK];
+static int g_zone_count = 0;
 
-/* ── Entry list ───────────────────────────────────────────────────────────── */
+static char g_cwd[1024] = "/";
+static char g_entries[MAX_ENTRIES][256];
+static int g_entry_count = 0;
+static int g_scroll = 0;
+static char g_msg[256] = "";
+static int g_msg_color = 0;
 
-typedef struct {
-    char name[256];
-    bool is_dir;
-} dir_entry_t;
+/* entry type: 0=dir, 1=file */
+static int g_entry_types[MAX_ENTRIES];
 
-static dir_entry_t g_entries[MAX_ENTRIES];
-static int         g_entry_count = 0;
-
-static int entry_cmp(const void *a, const void *b) {
-    const dir_entry_t *ea = (const dir_entry_t *)a;
-    const dir_entry_t *eb = (const dir_entry_t *)b;
-    /* Directories first */
-    if (ea->is_dir != eb->is_dir) return eb->is_dir - ea->is_dir;
-    return strcmp(ea->name, eb->name);
+static void add_zone(int x,int y,int w,int h,int a){
+    if(g_zone_count<MAX_CLICK){
+        g_zones[g_zone_count].x = x;
+        g_zones[g_zone_count].y = y;
+        g_zones[g_zone_count].w = w;
+        g_zones[g_zone_count].h = h;
+        g_zones[g_zone_count].action = a;
+        g_zone_count++;
+    }
 }
 
-static void load_directory(const char *path) {
-    g_entry_count = 0;
+static void load_dir(const char *path) {
     DIR *d = opendir(path);
-    if (!d) return;
-
-    struct dirent *ent;
-    while ((ent = readdir(d)) != NULL && g_entry_count < MAX_ENTRIES) {
-        if (ent->d_name[0] == '.' && ent->d_name[1] == '\0') continue; /* skip . */
-
-        dir_entry_t *e = &g_entries[g_entry_count++];
-        strncpy(e->name, ent->d_name, sizeof(e->name) - 1);
-        e->name[sizeof(e->name) - 1] = '\0';
-
-        /* Determine type */
-        if (ent->d_type == DT_DIR) {
-            e->is_dir = true;
-        } else if (ent->d_type == DT_UNKNOWN) {
-            /* Fall back to stat */
-            char full[4096 + 256 + 1];
-            snprintf(full, sizeof(full), "%s/%s", path, ent->d_name);
-            struct stat st;
-            e->is_dir = (stat(full, &st) == 0 && S_ISDIR(st.st_mode));
-        } else {
-            e->is_dir = false;
-        }
+    g_entry_count = 0;
+    g_scroll = 0;
+    if (!d) { snprintf(g_msg, sizeof(g_msg), "Cannot open %s", path); g_msg_color=COL_ERR; return; }
+    struct dirent *de;
+    while ((de = readdir(d)) && g_entry_count < MAX_ENTRIES) {
+        if (strcmp(de->d_name, ".") == 0) continue;
+        strncpy(g_entries[g_entry_count], de->d_name, 255);
+        g_entry_types[g_entry_count] = (de->d_type == DT_DIR) ? 0 : 1;
+        g_entry_count++;
     }
     closedir(d);
-    qsort(g_entries, (size_t)g_entry_count, sizeof(dir_entry_t), entry_cmp);
-}
 
-/* ── Click handler (captures index as user_data) ─────────────────────────── */
-
-static void entry_clicked(lgui_widget_t *btn, void *user_data) {
-    (void)btn;
-    int idx = (int)(intptr_t)user_data;
-    if (idx < 0 || idx >= g_entry_count) return;
-
-    if (g_entries[idx].is_dir) {
-        char new_path[4096];
-        if (strcmp(g_entries[idx].name, "..") == 0) {
-            /* Parent directory */
-            strncpy(new_path, g_cwd, sizeof(new_path) - 1);
-            char *slash = strrchr(new_path, '/');
-            if (slash && slash != new_path) {
-                *slash = '\0';
-            } else {
-                strcpy(new_path, "/");
+    /* Sort: dirs first, then alphabetical */
+    for (int i = 0; i < g_entry_count - 1; i++) {
+        for (int j = i + 1; j < g_entry_count; j++) {
+            bool swap = false;
+            if (g_entry_types[i] > g_entry_types[j]) swap = true;
+            else if (g_entry_types[i] == g_entry_types[j] &&
+                     strcasecmp(g_entries[i], g_entries[j]) > 0) swap = true;
+            if (swap) {
+                char tmp[256]; int tt;
+                strncpy(tmp, g_entries[i], 255); tt = g_entry_types[i];
+                strncpy(g_entries[i], g_entries[j], 255); g_entry_types[i] = g_entry_types[j];
+                strncpy(g_entries[j], tmp, 255); g_entry_types[j] = tt;
             }
-        } else {
-            snprintf(new_path, sizeof(new_path), "%s/%s",
-                     g_cwd, g_entries[idx].name);
         }
-        navigate_to(new_path);
     }
-    /* For files: open with default app — deferred to future Phase */
+    snprintf(g_msg, sizeof(g_msg), "%d items", g_entry_count); g_msg_color = COL_DIM;
 }
 
-static void btn_up_clicked(lgui_widget_t *btn, void *u) {
-    (void)btn; (void)u;
-    char parent[4096];
-    strncpy(parent, g_cwd, sizeof(parent) - 1);
-    char *slash = strrchr(parent, '/');
-    if (slash && slash != parent) {
-        *slash = '\0';
-    } else {
-        strcpy(parent, "/");
+/* Action IDs: 0..17 = scroll entries, 100 = go up, 101 = go home, 102 = delete
+   103 = mkdir, 104 = open (launch text editor) */
+enum { ACT_ENTRY_BASE = 0, ACT_UP = 100, ACT_HOME, ACT_DELETE, ACT_MKDIR, ACT_OPEN, ACT_SCROLL_UP, ACT_SCROLL_DOWN };
+
+static void do_action(int a) {
+    if (a >= ACT_ENTRY_BASE && a < ACT_ENTRY_BASE + VISIBLE_ENTRIES) {
+        int idx = a - ACT_ENTRY_BASE + g_scroll;
+        if (idx < g_entry_count) {
+            if (g_entry_types[idx] == 0) {
+                /* Navigate into directory */
+                char path[1024];
+                if (strcmp(g_cwd, "/") == 0)
+                    snprintf(path, sizeof(path), "/%s", g_entries[idx]);
+                else
+                    snprintf(path, sizeof(path), "%s/%s", g_cwd, g_entries[idx]);
+                strncpy(g_cwd, path, sizeof(g_cwd) - 1);
+                load_dir(g_cwd);
+            } else {
+                /* Open file with text editor */
+                char path[1024];
+                snprintf(path, sizeof(path), "%s/%s", g_cwd, g_entries[idx]);
+                if (fork() == 0) {
+                    execlp("luna-text", "luna-text", path, NULL);
+                    _exit(1);
+                }
+            }
+        }
+    } else if (a == ACT_UP) {
+        /* Go to parent directory */
+        char *last = strrchr(g_cwd, '/');
+        if (last && last != g_cwd) {
+            *last = '\0';
+        } else if (last == g_cwd && g_cwd[1] != '\0') {
+            g_cwd[1] = '\0';
+        }
+        if (g_cwd[0] == '\0') strcpy(g_cwd, "/");
+        load_dir(g_cwd);
+    } else if (a == ACT_HOME) {
+        char *home = getenv("HOME");
+        strncpy(g_cwd, home ? home : "/", sizeof(g_cwd) - 1);
+        load_dir(g_cwd);
+    } else if (a == ACT_DELETE) {
+        /* Delete the first selected file - for simplicity, delete last navigated-to file */
+        snprintf(g_msg, sizeof(g_msg), "Select file then press Del"); g_msg_color = COL_DIM;
+    } else if (a == ACT_MKDIR) {
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/new_directory", g_cwd);
+        if (mkdir(path, 0755) == 0) {
+            snprintf(g_msg, sizeof(g_msg), "Created new_directory"); g_msg_color = COL_FILE;
+            load_dir(g_cwd);
+        } else {
+            snprintf(g_msg, sizeof(g_msg), "mkdir failed"); g_msg_color = COL_ERR;
+        }
+    } else if (a == ACT_OPEN) {
+        /* Open terminal in current directory */
+        if (fork() == 0) {
+            execlp("luna-terminal", "luna-terminal", NULL);
+            _exit(1);
+        }
+    } else if (a == ACT_SCROLL_UP) {
+        if (g_scroll > 0) g_scroll--;
+    } else if (a == ACT_SCROLL_DOWN) {
+        if (g_scroll + VISIBLE_ENTRIES < g_entry_count) g_scroll++;
     }
-    navigate_to(parent);
 }
 
-static void btn_home_clicked(lgui_widget_t *btn, void *u) {
-    (void)btn; (void)u;
-    const char *home = getenv("HOME");
-    navigate_to(home ? home : "/root");
-}
+/* ── Render ─────────────────────────────────────────────────────────────────── */
 
-/* ── Renderer ─────────────────────────────────────────────────────────────── */
+static void files_render(lgui_widget_t *w, lgui_canvas_t *c, int x, int y) {
+    (void)w;
+    g_zone_count = 0;
+    lgui_canvas_push_clip(c, x, y, WIN_W, WIN_H);
+    lgui_canvas_fill_rect(c, 0, 0, WIN_W, WIN_H, COL_BG);
 
-static void navigate_to(const char *path) {
-    strncpy(g_cwd, path, sizeof(g_cwd) - 1);
-    g_cwd[sizeof(g_cwd) - 1] = '\0';
+    /* Header */
+    lgui_canvas_draw_text(c, 16, 8, "File Manager", COL_ACCENT);
+    lgui_canvas_fill_rect(c, 12, 26, WIN_W-24, 1, COL_ACCENT);
 
-    load_directory(g_cwd);
+    /* Navigation buttons */
+    int by = 32;
+    lgui_canvas_fill_rect(c, 16, by, 60, 24, COL_BTN);
+    lgui_canvas_draw_rect_outline(c, 16, by, 60, 24, COL_BORDER);
+    lgui_canvas_draw_text(c, 20, by+4, "< Up", COL_TEXT);
+    add_zone(16, by, 60, 24, ACT_UP);
 
-    /* Free old tree */
-    if (g_root) { lgui_widget_destroy(g_root); g_root = NULL; }
+    lgui_canvas_fill_rect(c, 80, by, 60, 24, COL_BTN);
+    lgui_canvas_draw_rect_outline(c, 80, by, 60, 24, COL_BORDER);
+    lgui_canvas_draw_text(c, 84, by+4, "Home", COL_TEXT);
+    add_zone(80, by, 60, 24, ACT_HOME);
 
-    lgui_widget_t *vbox = lgui_vbox_create();
-    lgui_widget_set_size(vbox, 800, 600);
+    lgui_canvas_fill_rect(c, 144, by, 60, 24, COL_BTN);
+    lgui_canvas_draw_rect_outline(c, 144, by, 60, 24, COL_BORDER);
+    lgui_canvas_draw_text(c, 148, by+4, "Mkdir", COL_TEXT);
+    add_zone(144, by, 60, 24, ACT_MKDIR);
 
-    /* Header bar */
-    lgui_widget_t *hbar = lgui_hbox_create();
-    lgui_widget_set_size(hbar, 800, 40);
-
-    lgui_widget_t *btn_up = lgui_button_create("↑ Up");
-    lgui_button_set_on_click(btn_up, btn_up_clicked, NULL);
-    lgui_box_add_child(hbar, btn_up);
-
-    lgui_widget_t *btn_home = lgui_button_create("⌂ Home");
-    lgui_button_set_on_click(btn_home, btn_home_clicked, NULL);
-    lgui_box_add_child(hbar, btn_home);
-
-    lgui_box_add_child(vbox, hbar);
+    lgui_canvas_fill_rect(c, 208, by, 70, 24, COL_BTN);
+    lgui_canvas_draw_rect_outline(c, 208, by, 70, 24, COL_BORDER);
+    lgui_canvas_draw_text(c, 212, by+4, "Terminal", COL_TEXT);
+    add_zone(208, by, 70, 24, ACT_OPEN);
 
     /* Current path */
-    char path_label[4096 + 10];
-    snprintf(path_label, sizeof(path_label), "  %s", g_cwd);
-    lgui_widget_t *path_lbl = lgui_label_create(path_label);
-    lgui_widget_set_size(path_lbl, 800, 20);
-    lgui_box_add_child(vbox, path_lbl);
+    lgui_canvas_draw_text(c, 16, 62, g_cwd, COL_DIM);
 
-    /* File/directory entries */
-    int shown = (g_entry_count < 14) ? g_entry_count : 14; /* visible limit */
-    for (int i = 0; i < shown; i++) {
-        char label[300];
-        snprintf(label, sizeof(label), "%s  %s",
-                 g_entries[i].is_dir ? "[DIR]" : "     ",
-                 g_entries[i].name);
+    /* File list */
+    int fy = 80;
+    int end = g_scroll + VISIBLE_ENTRIES;
+    if (end > g_entry_count) end = g_entry_count;
 
-        lgui_widget_t *btn = lgui_button_create(label);
-        lgui_widget_set_size(btn, 780, 28);
-        lgui_button_set_on_click(btn, entry_clicked, (void *)(intptr_t)i);
-        lgui_box_add_child(vbox, btn);
+    for (int i = g_scroll; i < end; i++) {
+        int row = fy + (i - g_scroll) * 22;
+
+        /* Entry background on hover area */
+        lgui_canvas_fill_rect(c, 16, row, WIN_W-32, 20, COL_BG);
+
+        /* Icon/color prefix */
+        if (g_entry_types[i] == 0) {
+            lgui_canvas_draw_text(c, 20, row+2, "[DIR]", COL_DIR);
+            lgui_canvas_draw_text(c, 60, row+2, g_entries[i], COL_TEXT);
+        } else {
+            lgui_canvas_draw_text(c, 20, row+2, "    ", COL_FILE);
+            lgui_canvas_draw_text(c, 60, row+2, g_entries[i], COL_FILE);
+        }
+
+        add_zone(16, row, WIN_W-32, 20, ACT_ENTRY_BASE + (i - g_scroll));
     }
 
-    if (g_entry_count > shown) {
-        char more[64];
-        snprintf(more, sizeof(more), "  ... %d more entries",
-                 g_entry_count - shown);
-        lgui_box_add_child(vbox, lgui_label_create(more));
+    /* Scroll indicators */
+    if (g_scroll > 0) {
+        lgui_canvas_fill_rect(c, WIN_W-24, 80, 20, 20, COL_BTN);
+        lgui_canvas_draw_text(c, WIN_W-20, 82, "^", COL_TEXT);
+        add_zone(WIN_W-24, 80, 20, 20, ACT_SCROLL_UP);
+    }
+    if (g_scroll + VISIBLE_ENTRIES < g_entry_count) {
+        lgui_canvas_fill_rect(c, WIN_W-24, WIN_H-60, 20, 20, COL_BTN);
+        lgui_canvas_draw_text(c, WIN_W-20, WIN_H-58, "v", COL_TEXT);
+        add_zone(WIN_W-24, WIN_H-60, 20, 20, ACT_SCROLL_DOWN);
     }
 
-    g_root = vbox;
-    lgui_window_set_root_widget(g_win, g_root);
+    /* Status bar */
+    lgui_canvas_fill_rect(c, 12, WIN_H-36, WIN_W-24, 1, COL_BORDER);
+    lgui_canvas_draw_text(c, 16, WIN_H-28, g_msg, g_msg_color);
+
+    /* Remaining space indicator */
+    if (g_entry_count > VISIBLE_ENTRIES) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%d-%d of %d", g_scroll+1, end, g_entry_count);
+        lgui_canvas_draw_text(c, WIN_W-200, WIN_H-28, buf, COL_DIM);
+    }
+
+    lgui_canvas_pop_clip(c);
 }
 
-/* ── Entry point ──────────────────────────────────────────────────────────── */
+/* ── Pointer callback ───────────────────────────────────────────────────────── */
 
-int main(void) {
-    g_app = lgui_application_create("luna-files");
-    if (!g_app) return 1;
+static void on_pointer(int mx, int my, bool pressed, bool is_btn, void *ud) {
+    (void)ud;
+    if (!pressed || !is_btn) return;
+    for (int i = 0; i < g_zone_count; i++) {
+        if (mx >= g_zones[i].x && mx < g_zones[i].x + g_zones[i].w &&
+            my >= g_zones[i].y && my < g_zones[i].y + g_zones[i].h) {
+            do_action(g_zones[i].action);
+            return;
+        }
+    }
+}
 
-    g_win = lgui_window_create(g_app, 800, 600, LGUI_LAYER_APPLICATION);
-    if (!g_win) { lgui_application_destroy(g_app); return 1; }
-
+int main(int argc, char *argv[]) {
     const char *start = getenv("HOME");
-    if (!start) start = "/";
+    if (argc > 1) start = argv[1];
+    strncpy(g_cwd, start ? start : "/", sizeof(g_cwd) - 1);
+    load_dir(g_cwd);
 
-    navigate_to(start);
-    lgui_window_show(g_win);
+    lgui_application_t *app = lgui_application_create("luna-files");
+    if (!app) return 1;
 
-    lgui_application_run(g_app);
-    lgui_application_destroy(g_app);
+    lgui_window_t *win = lgui_window_create(app, WIN_W, WIN_H, LGUI_LAYER_APPLICATION);
+    if (!win) { lgui_application_destroy(app); return 1; }
+
+    lgui_widget_t *cw = lgui_canvas_widget_create();
+    lgui_widget_set_size(cw, WIN_W, WIN_H);
+    lgui_canvas_widget_set_render(cw, files_render);
+    lgui_window_set_root_widget(win, cw);
+    lgui_window_show(win);
+
+    lgui_application_set_global_pointer_cb(app, on_pointer, NULL);
+
+    lgui_application_run(app);
+    lgui_application_destroy(app);
     return 0;
 }

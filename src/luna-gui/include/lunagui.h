@@ -110,6 +110,9 @@ void lgui_canvas_draw_rect_outline(lgui_canvas_t *canvas,
  */
 void lgui_canvas_draw_text(lgui_canvas_t *canvas, int x, int y,
                             const char *text, uint32_t color);
+void lgui_canvas_draw_text_len(lgui_canvas_t *canvas, int x, int y,
+                                const char *text, int max_chars, uint32_t color);
+int  lgui_canvas_text_width(const char *text, int max_chars);
 
 /* ── Window ───────────────────────────────────────────────────────────────── */
 
@@ -145,6 +148,7 @@ void lgui_window_update(lgui_window_t *win);
 typedef void (*lgui_button_click_cb)(lgui_widget_t *button, void *user_data);
 typedef void (*lgui_key_cb)(lgui_widget_t *widget, uint32_t key, uint32_t modifiers, void *user_data);
 typedef void (*lgui_clipboard_cb)(const char *text, void *user_data);
+typedef void (*lgui_textfield_change_cb)(lgui_widget_t *textfield, const char *text, void *user_data);
 
 /* ── Application extensions ───────────────────────────────────────────────── */
 
@@ -236,6 +240,14 @@ void           lgui_canvas_widget_set_render(lgui_widget_t *widget, lgui_canvas_
 
 /* Widget sizing */
 void lgui_widget_set_size(lgui_widget_t *widget, int width, int height);
+
+/* TextField */
+lgui_widget_t *lgui_textfield_create(const char *placeholder);
+void lgui_textfield_set_text(lgui_widget_t *textfield, const char *text);
+const char *lgui_textfield_get_text(lgui_widget_t *textfield);
+void lgui_textfield_set_on_change(lgui_widget_t *textfield, lgui_textfield_change_cb cb, void *user_data);
+void lgui_textfield_set_password(lgui_widget_t *textfield, bool password);
+void lgui_textfield_set_max_length(lgui_widget_t *textfield, int max_len);
 
 /* Event listeners */
 void lgui_widget_set_on_key(lgui_widget_t *widget, lgui_key_cb cb, void *user_data);

@@ -380,7 +380,7 @@ static lgui_widget_t *lgui_widget_hittest(lgui_widget_t *w,
 }
 
 static void lgui_dispatch_pointer_button(lgui_application_t *app,
-                                          int x, int y, bool pressed) {
+                                           int x, int y, bool pressed) {
     if (!pressed) return; /* Only fire on button-down */
 
     for (int i = 0; i < app->window_count; i++) {
@@ -389,7 +389,18 @@ static void lgui_dispatch_pointer_button(lgui_application_t *app,
 
         lgui_widget_t *hit = lgui_widget_hittest(win->root_widget, 0, 0, x, y);
         if (hit) {
+            /* Unfocus previous widget */
+            if (app->focused_widget && app->focused_widget->type == 7)
+                app->focused_widget->focused = false;
+
             app->focused_widget = hit;
+
+            /* Focus new TextField */
+            if (hit->type == 7) {
+                hit->focused = true;
+                hit->cursor_pos = hit->text_len; /* Move cursor to end */
+            }
+
             if (hit->type == 2 /* Button */ && hit->on_click) {
                 hit->on_click(hit, hit->user_data);
                 /* Window tree may have changed; mark all windows dirty */
@@ -400,6 +411,79 @@ static void lgui_dispatch_pointer_button(lgui_application_t *app,
             return;
         }
     }
+
+    /* Clicked on nothing - unfocus */
+    if (app->focused_widget && app->focused_widget->type == 7)
+        app->focused_widget->focused = false;
+}
+
+/* ---------------------------------------------------------------------------
+ * TextField keyboard input handling
+ * ---------------------------------------------------------------------------*/
+
+static void lgui_textfield_handle_key(lgui_widget_t *tf, uint32_t key, uint32_t modifiers) {
+    if (!tf || tf->type != 7) return;
+
+    char c = lgui_keymap_translate(key, modifiers);
+
+    if (c >= 32 && c < 127) {
+        /* Printable character - insert at cursor */
+        if (tf->text_len < tf->max_length) {
+            /* Shift digits to make room */
+            memmove(&tf->text[tf->cursor_pos + 1], &tf->text[tf->cursor_pos],
+                    (size_t)(tf->text_len - tf->cursor_pos));
+            tf->text[tf->cursor_pos] = c;
+            tf->text_len++;
+            tf->cursor_pos++;
+            /* Scroll view if cursor goes past visible area */
+            int max_visible = (tf->width - 16) / 8;
+            if (tf->cursor_pos > tf->view_offset + max_visible)
+                tf->view_offset = tf->cursor_pos - max_visible;
+        }
+    } else if (key == 0x00E7) {
+        /* Backspace (KEY_BACKSPACE = 0x00E7 in linux input) */
+        if (tf->cursor_pos > 0) {
+            memmove(&tf->text[tf->cursor_pos - 1], &tf->text[tf->cursor_pos],
+                    (size_t)(tf->text_len - tf->cursor_pos));
+            tf->text_len--;
+            tf->cursor_pos--;
+            if (tf->view_offset > 0 && tf->cursor_pos < tf->view_offset)
+                tf->view_offset = tf->cursor_pos;
+        }
+    } else if (key == 0x009C) {
+        /* Delete key */
+        if (tf->cursor_pos < tf->text_len) {
+            memmove(&tf->text[tf->cursor_pos], &tf->text[tf->cursor_pos + 1],
+                    (size_t)(tf->text_len - tf->cursor_pos - 1));
+            tf->text_len--;
+        }
+    } else if (key == 0x0098) {
+        /* Left arrow */
+        if (tf->cursor_pos > 0) tf->cursor_pos--;
+        if (tf->view_offset > 0 && tf->cursor_pos < tf->view_offset)
+            tf->view_offset = tf->cursor_pos;
+    } else if (key == 0x0097) {
+        /* Right arrow */
+        if (tf->cursor_pos < tf->text_len) tf->cursor_pos++;
+        int max_visible = (tf->width - 16) / 8;
+        if (tf->cursor_pos > tf->view_offset + max_visible)
+            tf->view_offset = tf->cursor_pos - max_visible;
+    } else if (key == 0x0096) {
+        /* Home */
+        tf->cursor_pos = 0;
+        tf->view_offset = 0;
+    } else if (key == 0x009B) {
+        /* End */
+        tf->cursor_pos = tf->text_len;
+        int max_visible = (tf->width - 16) / 8;
+        if (tf->cursor_pos > tf->view_offset + max_visible)
+            tf->view_offset = tf->cursor_pos - max_visible;
+    }
+
+    tf->text[tf->text_len] = '\0';
+
+    if (tf->on_text_change)
+        tf->on_text_change(tf, tf->text, tf->user_data);
 }
 
 /* ---------------------------------------------------------------------------
@@ -560,6 +644,11 @@ int lgui_application_run(lgui_application_t *app) {
                         /* Dispatch to global callback if registered (e.g. for WM) */
                         if (state != 0 && app->global_key_cb) {
                             app->global_key_cb(key, modifiers, app->global_key_user_data);
+                        }
+                        
+                        /* Handle TextField keyboard input */
+                        if (state != 0 && app->focused_widget && app->focused_widget->type == 7) {
+                            lgui_textfield_handle_key(app->focused_widget, key, modifiers);
                         }
                         
                         /* Also dispatch to focused widget */

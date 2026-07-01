@@ -18,7 +18,8 @@ LUNAGUI_SOURCES := \
     $(LUNAGUI_SRC)/widgets/vbox.c \
     $(LUNAGUI_SRC)/widgets/hbox.c \
     $(LUNAGUI_SRC)/widgets/canvas_widget.c \
-    $(LUNAGUI_SRC)/widgets/scroll.c
+    $(LUNAGUI_SRC)/widgets/scroll.c \
+    $(LUNAGUI_SRC)/widgets/textfield.c
 
 LUNAGUI_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNAGUI_SOURCES))
 LUNAGUI_LIB := $(BUILD_LUNAGUI)/liblunagui.a

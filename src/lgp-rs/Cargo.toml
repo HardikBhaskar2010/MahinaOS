@@ -1,0 +1,11 @@
+[package]
+name = "lgp"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+libc = "0.2"
