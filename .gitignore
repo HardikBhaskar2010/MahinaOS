@@ -55,3 +55,7 @@ dist/
 compile_commands.json
 .clangd/
 .cache/
+
+# Rust / Cargo
+target/
+**/*.rs.bk
