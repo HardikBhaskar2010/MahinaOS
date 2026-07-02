@@ -188,12 +188,27 @@ impl WallpaperEngine {
         let crop_x = scaled_w.saturating_sub(dst_w) / 2;
         let crop_y = scaled_h.saturating_sub(dst_h) / 2;
 
+        let scale_y = if use_width_scale {
+            ((src_h as u64) << 16) / (scaled_h as u64).max(1)
+        } else {
+            ((src_h as u64) << 16) / (dst_h as u64).max(1)
+        };
+        
+        let scale_x = if use_width_scale {
+            ((src_w as u64) << 16) / (dst_w as u64).max(1)
+        } else {
+            ((src_w as u64) << 16) / (scaled_w as u64).max(1)
+        };
+
         for dy in 0..dst_h {
-            let sy = if use_width_scale {
-                ((dy + crop_y).saturating_mul(src_h) / scaled_h.max(1)).min(src_h - 1)
+            let sy_fixed = if use_width_scale {
+                (dy + crop_y) as u64 * scale_y
             } else {
-                (dy.saturating_mul(src_h) / dst_h.max(1)).min(src_h - 1)
+                dy as u64 * scale_y
             };
+            let sy0 = (sy_fixed >> 16) as usize;
+            let sy1 = (sy0 + 1).min(src_h - 1);
+            let y_frac = ((sy_fixed >> 8) & 0xFF) as u32;
 
             let dst_row_start = dy.saturating_mul(stride);
             let dst_row_end = dst_row_start.saturating_add(dst_w * 4);
@@ -202,18 +217,40 @@ impl WallpaperEngine {
             };
 
             for dx in 0..dst_w {
-                let sx = if use_width_scale {
-                    (dx.saturating_mul(src_w) / dst_w.max(1)).min(src_w - 1)
+                let sx_fixed = if use_width_scale {
+                    dx as u64 * scale_x
                 } else {
-                    ((dx + crop_x).saturating_mul(src_w) / scaled_w.max(1)).min(src_w - 1)
+                    (dx + crop_x) as u64 * scale_x
                 };
-                let src_idx = sy.saturating_mul(src_w).saturating_add(sx).saturating_mul(4);
-                let dst_idx = dx.saturating_mul(4);
-                if let (Some(s), Some(d)) =
-                    (src.get(src_idx..src_idx + 4), dst_row.get_mut(dst_idx..dst_idx + 4))
-                {
-                    d.copy_from_slice(s);
+                let sx0 = (sx_fixed >> 16) as usize;
+                let sx1 = (sx0 + 1).min(src_w - 1);
+                let x_frac = ((sx_fixed >> 8) & 0xFF) as u32;
+
+                let idx00 = (sy0 * src_w + sx0) * 4;
+                let idx10 = (sy0 * src_w + sx1) * 4;
+                let idx01 = (sy1 * src_w + sx0) * 4;
+                let idx11 = (sy1 * src_w + sx1) * 4;
+
+                let c00 = src.get(idx00..idx00+4).unwrap_or(&[0,0,0,0]);
+                let c10 = src.get(idx10..idx10+4).unwrap_or(&[0,0,0,0]);
+                let c01 = src.get(idx01..idx01+4).unwrap_or(&[0,0,0,0]);
+                let c11 = src.get(idx11..idx11+4).unwrap_or(&[0,0,0,0]);
+
+                let mut out = [0u8; 4];
+                for c in 0..4 {
+                    let v00 = c00[c] as u32;
+                    let v10 = c10[c] as u32;
+                    let v01 = c01[c] as u32;
+                    let v11 = c11[c] as u32;
+
+                    let top = v00 * (256 - x_frac) + v10 * x_frac;
+                    let bot = v01 * (256 - x_frac) + v11 * x_frac;
+                    let val = (top * (256 - y_frac) + bot * y_frac) >> 16;
+                    out[c] = val as u8;
                 }
+
+                let dst_idx = dx * 4;
+                dst_row[dst_idx..dst_idx+4].copy_from_slice(&out);
             }
         }
         true

@@ -2,7 +2,7 @@
 # build-kernel.sh — Compile a custom monolithic Linux kernel for Mahina OS
 set -e
 
-KERNEL_VERSION="6.6.36"
+KERNEL_VERSION="6.6"
 BUILD_DIR="/tmp/mahina-kernel-build"
 MAHINA_VMLINUZ="$(pwd)/build/vmlinuz-mahina"
 
@@ -10,13 +10,13 @@ echo "  KERNEL  Downloading Linux ${KERNEL_VERSION}..."
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-if [ ! -f "linux-${KERNEL_VERSION}.tar.xz" ]; then
-    wget -q "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz"
+if [ ! -f "linux-${KERNEL_VERSION}.tar.gz" ]; then
+    wget -qO "linux-${KERNEL_VERSION}.tar.gz" "https://github.com/torvalds/linux/archive/refs/tags/v${KERNEL_VERSION}.tar.gz"
 fi
 
 if [ ! -d "linux-${KERNEL_VERSION}" ]; then
     echo "  KERNEL  Extracting source..."
-    tar -xf "linux-${KERNEL_VERSION}.tar.xz"
+    tar -xf "linux-${KERNEL_VERSION}.tar.gz"
 fi
 
 cd "linux-${KERNEL_VERSION}"

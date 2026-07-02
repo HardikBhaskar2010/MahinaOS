@@ -56,10 +56,12 @@ int drm_connector_setup(drm_device_t *dev) {
         if (conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0) {
             /* Find a preferred mode, or just take the first one */
             drmModeModeInfo *mode = &conn->modes[0];
+            uint32_t best_area = 0;
             for (int m = 0; m < conn->count_modes; m++) {
-                if (conn->modes[m].type & DRM_MODE_TYPE_PREFERRED) {
+                uint32_t area = conn->modes[m].hdisplay * conn->modes[m].vdisplay;
+                if (area > best_area) {
+                    best_area = area;
                     mode = &conn->modes[m];
-                    break;
                 }
             }
 

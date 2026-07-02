@@ -207,7 +207,7 @@ build/retro_lake.lraw: tools/convert_video.py build/synthwave.lraw
 	@mkdir -p build
 	@if [ -f "$(WALLPAPER_MP4)" ] && command -v ffmpeg >/dev/null 2>&1; then \
 		echo "  CONVERT $(WALLPAPER_MP4) -> build/retro_lake.lraw"; \
-		python3 tools/convert_video.py "$(WALLPAPER_MP4)" build/retro_lake.lraw 480 270 30 10; \
+		python3 tools/convert_video.py "$(WALLPAPER_MP4)" build/retro_lake.lraw 960 540 30 10; \
 	else \
 		if [ ! -f "$(WALLPAPER_MP4)" ]; then \
 			echo "  WARN    $(WALLPAPER_MP4) not found; using generated fallback"; \
