@@ -281,6 +281,9 @@ static void lgp_state_close_client(lgp_compositor_state_t *state, lgp_client_t *
 
     LGP_DEBUG("ipc", "Disconnecting LGP client session=%u fd=%d",
               client->session_id, client->fd);
+    if (state->wm_client == client) {
+        state->wm_client = NULL;
+    }
     epoll_ctl(state->epoll_fd, EPOLL_CTL_DEL, client->fd, NULL);
     lgp_surface_manager_destroy_for_client(&state->surface_manager, client);
     lgp_state_remove_client(state, client);

@@ -52,6 +52,9 @@ fn verify_shadow_password(username: &str, password: &str) -> bool {
         Err(_) => return false,
     };
 
+    static CRYPT_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _guard = CRYPT_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+
     extern "C" {
         fn crypt(key: *const libc::c_char, salt: *const libc::c_char) -> *mut libc::c_char;
     }

@@ -128,10 +128,13 @@ static bool lgui_send_commit(int lgp_fd, uint32_t surface_id,
     msg.msg_iov    = &iov;
     msg.msg_iovlen = 1;
 
-    uint8_t cmsg_buf[CMSG_SPACE(sizeof(int))];
-    memset(cmsg_buf, 0, sizeof(cmsg_buf));
-    msg.msg_control    = cmsg_buf;
-    msg.msg_controllen = sizeof(cmsg_buf);
+    union {
+        uint8_t buf[CMSG_SPACE(sizeof(int))];
+        struct cmsghdr align;
+    } cmsg_un;
+    memset(&cmsg_un, 0, sizeof(cmsg_un));
+    msg.msg_control    = cmsg_un.buf;
+    msg.msg_controllen = sizeof(cmsg_un.buf);
 
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     cmsg->cmsg_level = SOL_SOCKET;
@@ -230,6 +233,36 @@ lgui_window_t *lgui_window_create(lgui_application_t *app,
     }
 
     return win;
+}
+
+void lgui_window_destroy(lgui_window_t *win) {
+    if (!win) return;
+
+    if (win->app) {
+        for (int i = 0; i < win->app->window_count; i++) {
+            if (win->app->windows[i] == win) {
+                for (int j = i; j < win->app->window_count - 1; j++) {
+                    win->app->windows[j] = win->app->windows[j + 1];
+                }
+                win->app->window_count--;
+                break;
+            }
+        }
+    }
+
+    if (win->canvas) {
+        lgui_canvas_destroy(win->canvas);
+        win->canvas = NULL;
+    }
+    if (win->buffer_map && win->buffer_map != MAP_FAILED) {
+        munmap(win->buffer_map, win->buffer_size);
+        win->buffer_map = NULL;
+    }
+    if (win->buffer_fd >= 0) {
+        close(win->buffer_fd);
+        win->buffer_fd = -1;
+    }
+    free(win);
 }
 
 void lgui_window_set_root_widget(lgui_window_t *win, lgui_widget_t *widget) {
@@ -338,6 +371,7 @@ lgui_canvas_t *lgui_window_get_canvas(lgui_window_t *win) {
 
 void *lgui_window_get_pixels(lgui_window_t *win) {
     if (!win) return NULL;
+    win->dirty = true;
     return win->buffer_map;
 }
 
@@ -348,6 +382,7 @@ void lgui_window_set_argb(lgui_window_t *win, bool argb) {
 void lgui_window_update(lgui_window_t *win) {
     if (!win || !win->app || win->app->lgp_fd < 0) return;
     if (win->surface_id == 0u) return; /* Window not yet shown */
+    if (!win->dirty) return;
 
     lgui_window_render_internal(win);
 
@@ -358,4 +393,5 @@ void lgui_window_update(lgui_window_t *win) {
                      win->buffer_size,
                      win->buffer_fd,
                      win->argb);
+    win->dirty = false;
 }

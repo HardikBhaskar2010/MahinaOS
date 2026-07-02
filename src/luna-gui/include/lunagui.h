@@ -140,6 +140,12 @@ void lgui_window_set_root_widget(lgui_window_t *win, lgui_widget_t *widget);
 void lgui_window_show(lgui_window_t *win);
 
 /*
+ * lgui_window_destroy() — Free shared memory framebuffer, close memfd,
+ * destroy associated canvas, and free window structure.
+ */
+void lgui_window_destroy(lgui_window_t *win);
+
+/*
  * lgui_window_update() — Re-render the widget tree and send a new
  * COMMIT_BUFFER to the compositor. Safe to call from callbacks.
  */

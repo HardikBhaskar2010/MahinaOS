@@ -103,19 +103,23 @@ fn main() -> std::io::Result<()> {
     let mut wp_shadow = vec![0u8; (sw * sh * 4) as usize];
     let mut ov_shadow = vec![0u8; (sw * sh * 4) as usize];
 
+    let mut dirty = true;
+
     loop {
         // 1. Tick state (animations, stats updates, clock, child reaping)
         state.tick(&mut conn);
 
-        // 2. Render and commit wallpaper
-        state.wallpaper.render(&mut wp_shadow, sw * 4);
-        wallpaper.pixels().copy_from_slice(&wp_shadow);
-        wallpaper.commit(&mut conn)?;
+        // 2. Render and commit wallpaper & UI overlay only when dirty or during active animations
+        if dirty {
+            state.wallpaper.render(&mut wp_shadow, sw * 4);
+            wallpaper.pixels().copy_from_slice(&wp_shadow);
+            wallpaper.commit(&mut conn)?;
 
-        // 3. Render and commit UI overlay
-        state.render_overlay(&mut ov_shadow, sw * 4);
-        overlay.pixels().copy_from_slice(&ov_shadow);
-        overlay.commit(&mut conn)?;
+            state.render_overlay(&mut ov_shadow, sw * 4);
+            overlay.pixels().copy_from_slice(&ov_shadow);
+            overlay.commit(&mut conn)?;
+            dirty = false;
+        }
 
         // 4. Poll LGP socket for input & WM events
         // 33ms timeout targets ~30fps frame rate
@@ -129,6 +133,7 @@ fn main() -> std::io::Result<()> {
         }
 
         if (pfd.revents & POLLIN) != 0 {
+            dirty = true;
             loop {
                 // Check if data is available before calling recv to avoid blocking
                 let mut pfd2 = pollfd {

@@ -17,6 +17,9 @@ struct lgui_application_t {
     int  lgp_fd;
     bool running;
 
+    uint8_t rx_buf[8192];
+    size_t  rx_len;
+
     /* Capabilities granted by compositor during HELLO handshake */
     uint32_t caps_granted;
 

@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 pub const LGP_VERSION_MAJOR: u16 = 1;
 pub const LGP_VERSION_MINOR: u16 = 0;
 pub const LGP_HEADER_SIZE: usize = 6;
+pub const LGP_MAX_MSG_SIZE: usize = 65536;
 pub const LGP_SOCKET_PATH: &str = "/run/lgp/compositor.sock";
 
 #[repr(u16)]
@@ -161,7 +162,13 @@ impl LgpMessage {
         stream.read_exact(&mut header)?;
         let msg_type = u16::from_le_bytes([header[0], header[1]]);
         let total_len = u32::from_le_bytes([header[2], header[3], header[4], header[5]]) as usize;
-        let payload_len = total_len.saturating_sub(LGP_HEADER_SIZE);
+        if total_len < LGP_HEADER_SIZE || total_len > LGP_MAX_MSG_SIZE {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("invalid or oversized LGP message total_len: {}", total_len),
+            ));
+        }
+        let payload_len = total_len - LGP_HEADER_SIZE;
         let mut payload = vec![0u8; payload_len];
         if payload_len > 0 {
             stream.read_exact(&mut payload)?;

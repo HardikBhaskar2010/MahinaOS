@@ -110,7 +110,7 @@ impl LgpSurface {
         Ok(())
     }
 
-    pub fn pixels(&self) -> &mut [u8] {
+    pub fn pixels(&mut self) -> &mut [u8] {
         unsafe { std::slice::from_raw_parts_mut(self.buffer_map, self.buffer_size) }
     }
 
@@ -184,22 +184,27 @@ fn mmap_buffer(fd: RawFd, size: usize) -> std::io::Result<*mut u8> {
 }
 
 fn send_with_fd(stream: &mut impl std::os::unix::io::AsRawFd, data: &[u8], fd: RawFd) -> std::io::Result<()> {
-use std::os::unix::io::{AsRawFd, RawFd};
-
+    use std::os::unix::io::AsRawFd;
 
     let iov = libc::iovec {
         iov_base: data.as_ptr() as *mut libc::c_void,
         iov_len: data.len(),
     };
 
-    let mut cmsg_buf = [0u8; 32];
+    #[repr(C)]
+    union CmsgUnion {
+        buf: [u8; 32],
+        align: libc::cmsghdr,
+    }
+
+    let mut cmsg_un: CmsgUnion = unsafe { std::mem::zeroed() };
     let mut msg: libc::msghdr = unsafe { std::mem::zeroed() };
     msg.msg_iov = &iov as *const libc::iovec as *mut libc::iovec;
     msg.msg_iovlen = 1;
 
     let fd_size = std::mem::size_of::<RawFd>();
     let cmsg = unsafe {
-        let hdr = &mut *(&mut cmsg_buf as *mut [u8; 32] as *mut libc::cmsghdr);
+        let hdr = &mut *(cmsg_un.buf.as_mut_ptr() as *mut libc::cmsghdr);
         hdr.cmsg_len = libc::CMSG_LEN(fd_size as _) as _;
         hdr.cmsg_level = libc::SOL_SOCKET;
         hdr.cmsg_type = libc::SCM_RIGHTS;

@@ -268,11 +268,14 @@ void supervisor_pump(void) {
                 if (now < svc->scheduled_start_ms) continue;
 
                 bool can_start = true;
-                for (int j = 0; j < svc->after_count; j++) {
-                    service_t *dep = service_find(svc->after[j]);
-                    if (dep && dep->state != SERVICE_STATE_RUNNING && dep->state != SERVICE_STATE_DEGRADED) {
-                        can_start = false;
-                        break;
+                for (int j = 0; j < svc->dep_count; j++) {
+                    int dep_idx = svc->dep_indices[j];
+                    if (dep_idx >= 0 && dep_idx < g_service_count) {
+                        service_t *dep = &g_services[dep_idx];
+                        if (dep->state != SERVICE_STATE_RUNNING && dep->state != SERVICE_STATE_DEGRADED) {
+                            can_start = false;
+                            break;
+                        }
                     }
                 }
 
@@ -295,11 +298,14 @@ bool supervisor_is_boot_complete(void) {
             /* If this service is blocked by a STOPPED service (like lgp-compositor),
                do not let it hold up Stage 4 completion. */
             bool blocked_by_stopped = false;
-            for (int j = 0; j < g_services[i].after_count; j++) {
-                service_t *dep = service_find(g_services[i].after[j]);
-                if (dep && dep->state == SERVICE_STATE_STOPPED) {
-                    blocked_by_stopped = true;
-                    break;
+            for (int j = 0; j < g_services[i].dep_count; j++) {
+                int dep_idx = g_services[i].dep_indices[j];
+                if (dep_idx >= 0 && dep_idx < g_service_count) {
+                    service_t *dep = &g_services[dep_idx];
+                    if (dep->state == SERVICE_STATE_STOPPED) {
+                        blocked_by_stopped = true;
+                        break;
+                    }
                 }
             }
             if (blocked_by_stopped) {
