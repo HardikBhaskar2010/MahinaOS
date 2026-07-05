@@ -188,7 +188,7 @@ LUNA_GUI_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint verify help
 
-all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-shell luna-desktop luna-installer luna-terminal luna-settings luna-files luna-calc luna-text luna-about luna-tasks rust-apps build/live.lraw
+all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-installer luna-terminal rust-apps build/live.lraw
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -535,16 +535,6 @@ include src/lgp-compositor/Makefile.inc
 include src/luna-gui/Makefile.inc
 
 # ---------------------------------------------------------------------------
-# luna-shell
-# ---------------------------------------------------------------------------
-include src/luna-shell/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-desktop
-# ---------------------------------------------------------------------------
-include src/luna-desktop/Makefile.inc
-
-# ---------------------------------------------------------------------------
 # luna-installer
 # ---------------------------------------------------------------------------
 include src/luna-installer/Makefile.inc
@@ -553,33 +543,3 @@ include src/luna-installer/Makefile.inc
 # luna-terminal
 # ---------------------------------------------------------------------------
 include src/luna-terminal/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-settings
-# ---------------------------------------------------------------------------
-include src/luna-settings/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-files
-# ---------------------------------------------------------------------------
-include src/luna-files/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-calc
-# ---------------------------------------------------------------------------
-include src/luna-calc/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-text
-# ---------------------------------------------------------------------------
-include src/luna-text/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-about
-# ---------------------------------------------------------------------------
-include src/luna-about/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-tasks
-# ---------------------------------------------------------------------------
-include src/luna-tasks/Makefile.inc

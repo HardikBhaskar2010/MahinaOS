@@ -58,4 +58,10 @@ compile_commands.json
 
 # Rust / Cargo
 target/
+**/target/
 **/*.rs.bk
+
+# Scratch and Packages
+scratch/
+*.deb
+*.mp4
