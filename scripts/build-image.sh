@@ -91,6 +91,15 @@ done
 if [ -f "${BUILD_DIR}/luna-terminal/luna-terminal" ]; then
     sudo cp "${BUILD_DIR}/luna-terminal/luna-terminal" "$MNT_ROOT/usr/bin/"
 fi
+if [ -f "${BUILD_DIR}/luna-ai-d/luna-ai-d" ]; then
+    sudo cp "${BUILD_DIR}/luna-ai-d/luna-ai-d" "$MNT_ROOT/usr/bin/"
+fi
+if [ -f "${BUILD_DIR}/lpkg/lpkg" ]; then
+    sudo cp "${BUILD_DIR}/lpkg/lpkg" "$MNT_ROOT/usr/bin/"
+fi
+if [ -f "${BUILD_DIR}/rust/luna-island" ]; then
+    sudo cp "${BUILD_DIR}/rust/luna-island" "$MNT_ROOT/usr/bin/"
+fi
 
 # Deploy other applications
 for app in settings files calc installer tasks about text; do

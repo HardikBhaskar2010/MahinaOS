@@ -1,0 +1,27 @@
+# /etc/luna/services/luna-island.toml
+# This is the LUNA AI Island indicator UI.
+
+[service]
+name        = "luna-island"
+binary      = "/usr/bin/luna-island"
+description = "LUNA AI Island UI Indicator"
+args        = []
+
+[service.depends]
+after = ["lgp-compositor", "luna-ai-d"]
+
+[service.ready]
+method = "none"
+
+[service.restart]
+policy   = "always"
+attempts = 3
+delay_ms = 2000
+
+[service.stop]
+signal     = "SIGTERM"
+timeout_ms = 3000
+
+[service.identity]
+user  = "luna"
+group = "luna"

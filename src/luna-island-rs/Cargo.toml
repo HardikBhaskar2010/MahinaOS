@@ -1,0 +1,16 @@
+[package]
+name = "luna-island-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "luna-island"
+path = "src/main.rs"
+
+[dependencies]
+lgp = { path = "../lgp-rs" }
+lunagui = { path = "../lunagui-rs" }
+libc = "0.2"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }

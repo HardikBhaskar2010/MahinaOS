@@ -328,12 +328,19 @@ int main(void) {
                 console_drop_to_shell(NULL);
                 _exit(0);
             }
-
-            /* Spawn shell on virtual console tty1 (the virtual OS screen / keyboard) */
-            pid_t tty_shell_pid = fork();
-            if (tty_shell_pid == 0) {
-                console_drop_to_shell("/dev/tty1");
-                _exit(0);
+            
+            if (comp_result >= 0) {
+                LUNA_INFO("luna-init", "Stage 5: Starting luna-shell");
+                if (supervisor_start_one("luna-shell") < 0) {
+                    LUNA_WARN("luna-init", "luna-shell failed to start");
+                }
+            } else {
+                /* Spawn shell on virtual console tty1 (the virtual OS screen / keyboard) */
+                pid_t tty_shell_pid = fork();
+                if (tty_shell_pid == 0) {
+                    console_drop_to_shell("/dev/tty1");
+                    _exit(0);
+                }
             }
         }
     }

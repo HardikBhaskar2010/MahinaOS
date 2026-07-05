@@ -50,6 +50,8 @@ binaries=(
     "luna-installer/luna-installer"
     "luna-init-ctl/luna-init-ctl"
     "luna-splash/luna-splash"
+    "luna-ai-d/luna-ai-d"
+    "lpkg/lpkg"
 )
 
 # Rust application binaries
@@ -61,6 +63,7 @@ rust_binaries=(
     "rust/text-rs"
     "rust/tasks-rs"
     "rust/about-rs"
+    "rust/luna-island"
 )
 
 for b in "${rust_binaries[@]}"; do

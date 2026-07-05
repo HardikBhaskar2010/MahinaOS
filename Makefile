@@ -188,7 +188,7 @@ LUNA_GUI_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint verify help
 
-all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-installer luna-terminal rust-apps build/live.lraw
+all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-installer luna-terminal luna-ai-d lpkg rust-apps build/live.lraw
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -268,8 +268,8 @@ $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 
 RUST_SRC_DIR := $(SRC_DIR)
 RUST_TARGET_DIR := $(RUST_SRC_DIR)/target/x86_64-unknown-linux-musl/release
-RUST_BINARIES := luna-shell settings-rs files-rs calc-rs text-rs tasks-rs about-rs
-RUST_BIN_DIRS  := luna-shell-rs luna-settings-rs luna-files-rs luna-calc-rs luna-text-rs luna-tasks-rs luna-about-rs
+RUST_BINARIES := luna-shell settings-rs files-rs calc-rs text-rs tasks-rs about-rs luna-island
+RUST_BIN_DIRS  := luna-shell-rs luna-settings-rs luna-files-rs luna-calc-rs luna-text-rs luna-tasks-rs luna-about-rs luna-island-rs
 
 .PHONY: rust-apps rust-clean
 rust-apps: $(addprefix $(BUILD_DIR)/rust/,$(RUST_BINARIES))
@@ -296,6 +296,9 @@ $(RUST_TARGET_DIR)/tasks-rs: $(wildcard $(RUST_SRC_DIR)/luna-tasks-rs/src/*.rs)
 
 $(RUST_TARGET_DIR)/about-rs: $(wildcard $(RUST_SRC_DIR)/luna-about-rs/src/*.rs)
 	$(CARGO_BUILD_CMD) -p luna-about-rs
+
+$(RUST_TARGET_DIR)/luna-island: $(wildcard $(RUST_SRC_DIR)/luna-island-rs/src/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-island-rs
 
 $(BUILD_DIR)/rust/%: $(RUST_TARGET_DIR)/% | $(BUILD_DIR)/rust
 	@echo "  RUSTCP  $@"
@@ -543,3 +546,13 @@ include src/luna-installer/Makefile.inc
 # luna-terminal
 # ---------------------------------------------------------------------------
 include src/luna-terminal/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# luna-ai-d
+# ---------------------------------------------------------------------------
+include src/luna-ai-d/Makefile.inc
+
+# ---------------------------------------------------------------------------
+# lpkg
+# ---------------------------------------------------------------------------
+include src/lpkg/Makefile.inc

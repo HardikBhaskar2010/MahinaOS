@@ -75,4 +75,9 @@ void supervisor_on_exit(pid_t pid, int exit_code, bool by_signal);
  */
 bool supervisor_check_ready(service_t *svc, long long start_ms);
 
+/*
+ * supervisor_signal_ready() — Marks a service as ready when it signals via SIGUSR1.
+ */
+void supervisor_signal_ready(pid_t pid);
+
 #endif /* MAHINA_SUPERVISOR_H */

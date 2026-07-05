@@ -15,14 +15,17 @@
 #include "log.h"
 #include "reaper.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <netdb.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -30,6 +33,28 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
+
+/* ─── READY_SIGNAL tracking table ────────────────────────────────────────── */
+/*
+ * When a service sends SIGUSR1 to PID 1 to signal readiness, the signal
+ * handler calls supervisor_signal_ready(pid). We store a flag per service
+ * slot so supervisor_check_ready() can query it.
+ */
+static volatile sig_atomic_t g_signal_ready[SERVICE_MAX_COUNT];
+
+/*
+ * supervisor_signal_ready() — Called from the SIGUSR1 handler in signal.c.
+ * Finds the service by PID and marks it ready.
+ */
+void supervisor_signal_ready(pid_t pid)
+{
+    for (int i = 0; i < g_service_count; i++) {
+        if (g_services[i].pid == pid) {
+            g_signal_ready[i] = 1;
+            return;
+        }
+    }
+}
 
 #define COMP "supervisor"
 
@@ -74,17 +99,117 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
             return ok;
         }
 
-        case READY_HTTP:
-            /* Note: HTTP readiness requires network stack integration.
-             * For Stage 0, services using method=http are treated as READY_NONE.
+        case READY_HTTP: {
+            /*
+             * Real HTTP readiness probe.
+             *
+             * ready_path format: "host:port" (e.g. "localhost:11434").
+             * We open a TCP connection and send "GET / HTTP/1.0\r\n\r\n".
+             * If we receive at least "HTTP/1" we consider the service ready.
+             *
+             * Uses a 1-second connect timeout via select(2) with O_NONBLOCK.
              */
-            LUNA_WARN(COMP, "Service '%s': ready method 'http' not implemented "
-                      "in v0.1 — treating as immediate", svc->name);
-            return true;
+            if (elapsed > (long long)svc->ready_timeout_ms) return false;
 
-        case READY_SIGNAL:
-            /* Stubbed — signal readiness requires tracking per-service SIGUSR1.
-             * Treated as READY_NONE for v0.1. */
+            /* Parse host:port from ready_path */
+            char host[128] = "localhost";
+            int  port = 80;
+            {
+                const char *p = svc->ready_path;
+                if (strncmp(p, "http://", 7) == 0) p += 7;
+                else if (strncmp(p, "https://", 8) == 0) p += 8;
+
+                const char *slash = strchr(p, '/');
+                size_t len = slash ? (size_t)(slash - p) : strlen(p);
+
+                char host_port[256];
+                if (len >= sizeof(host_port)) len = sizeof(host_port) - 1;
+                memcpy(host_port, p, len);
+                host_port[len] = '\0';
+
+                const char *colon = strrchr(host_port, ':');
+                if (colon) {
+                    size_t hlen = (size_t)(colon - host_port);
+                    if (hlen >= sizeof(host)) hlen = sizeof(host) - 1;
+                    memcpy(host, host_port, hlen);
+                    host[hlen] = '\0';
+                    port = atoi(colon + 1);
+                } else if (host_port[0]) {
+                    snprintf(host, sizeof(host), "%s", host_port);
+                }
+            }
+            if (port <= 0 || port > 65535) port = 80;
+
+            /* Resolve hostname */
+            struct addrinfo hints = {0};
+            hints.ai_family   = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            struct addrinfo *ai = NULL;
+            char port_s[8];
+            snprintf(port_s, sizeof(port_s), "%d", port);
+            if (getaddrinfo(host, port_s, &hints, &ai) != 0 || !ai)
+                return false;
+
+            int sock = socket(ai->ai_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
+            if (sock < 0) { freeaddrinfo(ai); return false; }
+
+            bool ready = false;
+            int  cr = connect(sock, ai->ai_addr, ai->ai_addrlen);
+            if (cr == 0) {
+                ready = true; /* immediate connect (unlikely but handle) */
+            } else if (errno == EINPROGRESS) {
+                /* Wait up to 1 second for the connect to complete */
+                fd_set wfds;
+                FD_ZERO(&wfds);
+                FD_SET(sock, &wfds);
+                struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+                if (select(sock + 1, NULL, &wfds, NULL, &tv) > 0) {
+                    int err = 0;
+                    socklen_t el = sizeof(err);
+                    getsockopt(sock, SOL_SOCKET, SO_ERROR, &err, &el);
+                    if (err == 0) {
+                        /* Connected — send a minimal HTTP/1.0 GET */
+                        const char req[] = "GET / HTTP/1.0\r\n\r\n";
+                        (void)send(sock, req, sizeof(req) - 1, MSG_NOSIGNAL);
+                        /* Wait briefly for response */
+                        FD_ZERO(&wfds);
+                        FD_SET(sock, &wfds);
+                        tv = (struct timeval){ .tv_sec = 0, .tv_usec = 500000 };
+                        fd_set rfds;
+                        FD_ZERO(&rfds);
+                        FD_SET(sock, &rfds);
+                        if (select(sock + 1, &rfds, NULL, NULL, &tv) > 0) {
+                            char buf[16] = {0};
+                            ssize_t n = recv(sock, buf, sizeof(buf) - 1, 0);
+                            if (n > 0 && strncmp(buf, "HTTP/1", 6) == 0)
+                                ready = true;
+                        }
+                    }
+                }
+            }
+            close(sock);
+            freeaddrinfo(ai);
+            return ready;
+        }
+
+        case READY_SIGNAL: {
+            /*
+             * Real SIGUSR1-based readiness.
+             *
+             * The service sends SIGUSR1 to PID 1 when it is ready.
+             * The signal handler in signal.c calls supervisor_signal_ready(pid),
+             * which sets g_signal_ready[idx] = 1 for the service matching that PID.
+             *
+             * We find the index of this service in g_services[] and check the flag.
+             */
+            for (int idx = 0; idx < g_service_count; idx++) {
+                if (&g_services[idx] == svc) {
+                    return (g_signal_ready[idx] != 0);
+                }
+            }
+            return false;
+        }
+
         default:
             return true;
     }

@@ -12,6 +12,7 @@
 
 #include "signal.h"
 #include "log.h"
+#include "supervisor.h"
 
 #include <errno.h>
 #include <signal.h> // NOLINT(readability-duplicate-include)
@@ -81,7 +82,8 @@ signal_action_t signal_read(int sigfd) {
             return SIGNAL_ACTION_RELOAD;
 
         case SIGUSR1:
-            LUNA_INFO(COMP, "SIGUSR1 received — dumping state");
+            LUNA_INFO(COMP, "SIGUSR1 received from PID %u", info.ssi_pid);
+            supervisor_signal_ready(info.ssi_pid);
             return SIGNAL_ACTION_DUMP;
 
         default:

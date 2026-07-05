@@ -26,5 +26,5 @@ signal     = "SIGTERM"
 timeout_ms = 3000
 
 [service.identity]
-user  = "luna"
-group = "luna"
+user  = "root"
+group = "root"
