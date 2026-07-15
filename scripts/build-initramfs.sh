@@ -46,8 +46,6 @@ mkdir -p "${INITRAMFS_DIR}/etc/luna/services"
 # List of binaries to copy
 binaries=(
     "lgp-compositor/lgp-compositor"
-    "luna-terminal/luna-terminal"
-    "luna-installer/luna-installer"
     "luna-init-ctl/luna-init-ctl"
     "luna-splash/luna-splash"
     "luna-ai-d/luna-ai-d"

@@ -165,23 +165,7 @@ LGP_UNIT_TEST_SUPPORT := \
     $(SRC_DIR)/lgp-compositor/scene/surface.c \
     $(SRC_DIR)/lgp-compositor/logging/log.c
 
-LUNA_GUI_UNIT_TEST_SOURCES := \
-    $(TESTS_DIR)/unit/luna-gui/gui_test.c
 
-LUNA_GUI_UNIT_TEST_SUPPORT := \
-    $(SRC_DIR)/luna-gui/core/application.c \
-    $(SRC_DIR)/luna-gui/core/window.c \
-    $(SRC_DIR)/luna-gui/core/keyboard.c \
-    $(SRC_DIR)/luna-gui/render/canvas.c \
-    $(SRC_DIR)/luna-gui/render/font.c \
-    $(SRC_DIR)/luna-gui/render/render.c \
-    $(SRC_DIR)/luna-gui/widgets/widget.c \
-    $(SRC_DIR)/luna-gui/widgets/button.c \
-    $(SRC_DIR)/luna-gui/widgets/label.c \
-    $(SRC_DIR)/luna-gui/widgets/vbox.c \
-    $(SRC_DIR)/luna-gui/widgets/hbox.c \
-    $(SRC_DIR)/luna-gui/widgets/canvas_widget.c \
-    $(SRC_DIR)/luna-gui/widgets/scroll.c
 
 # ---------------------------------------------------------------------------
 # Primary targets
@@ -190,7 +174,7 @@ LUNA_GUI_UNIT_TEST_SUPPORT := \
 .PHONY: all luna-init luna-init-ctl luna-splash image run-qemu clean \
         test-unit test-fuzz lint verify help
 
-all: luna-init luna-init-ctl luna-splash lgp-compositor lunagui luna-installer luna-terminal luna-ai-d lpkg rust-apps build/live.lraw
+all: luna-init luna-init-ctl luna-splash lgp-compositor luna-ai-d lpkg rust-apps build/live.lraw
 
 luna-init: $(BUILD_DIR)/luna-init/luna-init
 
@@ -385,19 +369,7 @@ test-unit: $(UNITY_OBJ) $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(
 	    echo "  RUN     $$name"; \
 	    $(BUILD_DIR)/tests/$$name || failed=1; \
 	done; \
-	for src in $(LUNA_GUI_UNIT_TEST_SOURCES); do \
-	    name=gui_$$(basename $$src .c); \
-	    echo "  BUILD   $$name"; \
-	    $(CC) $(CFLAGS_TEST) $(INCLUDES) \
-	        -I$(TESTS_DIR)/vendor/unity \
-	        -I$(SRC_DIR)/luna-gui/include \
-	        $$src \
-	        $(LUNA_GUI_UNIT_TEST_SUPPORT) \
-	        $(UNITY_OBJ) \
-	        -o $(BUILD_DIR)/tests/$$name 2>&1 || { failed=1; continue; }; \
-	    echo "  RUN     $$name"; \
-	    $(BUILD_DIR)/tests/$$name || failed=1; \
-	done; \
+
 	if [ $$failed -eq 0 ]; then \
 	    echo "  PASS    All unit tests passed"; \
 	else \
@@ -534,20 +506,7 @@ help:
 # ---------------------------------------------------------------------------
 include src/lgp-compositor/Makefile.inc
 
-# ---------------------------------------------------------------------------
-# LunaGUI
-# ---------------------------------------------------------------------------
-include src/luna-gui/Makefile.inc
 
-# ---------------------------------------------------------------------------
-# luna-installer
-# ---------------------------------------------------------------------------
-include src/luna-installer/Makefile.inc
-
-# ---------------------------------------------------------------------------
-# luna-terminal
-# ---------------------------------------------------------------------------
-include src/luna-terminal/Makefile.inc
 
 # ---------------------------------------------------------------------------
 # luna-ai-d

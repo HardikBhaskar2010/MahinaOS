@@ -88,9 +88,6 @@ for rs_app in settings files calc tasks about text; do
         sudo cp "${BUILD_DIR}/rust/${rs_app}-rs" "$MNT_ROOT/usr/bin/"
     fi
 done
-if [ -f "${BUILD_DIR}/luna-terminal/luna-terminal" ]; then
-    sudo cp "${BUILD_DIR}/luna-terminal/luna-terminal" "$MNT_ROOT/usr/bin/"
-fi
 if [ -f "${BUILD_DIR}/luna-ai-d/luna-ai-d" ]; then
     sudo cp "${BUILD_DIR}/luna-ai-d/luna-ai-d" "$MNT_ROOT/usr/bin/"
 fi
@@ -102,7 +99,7 @@ if [ -f "${BUILD_DIR}/rust/luna-island" ]; then
 fi
 
 # Deploy other applications
-for app in settings files calc installer tasks about text; do
+for app in settings files calc tasks about text; do
     if [ -f "${BUILD_DIR}/luna-${app}/luna-${app}" ]; then
         sudo cp "${BUILD_DIR}/luna-${app}/luna-${app}" "$MNT_ROOT/usr/bin/"
     fi
