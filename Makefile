@@ -127,6 +127,8 @@ LUNA_INIT_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNA_INIT_SOUR
 LUNA_SPLASH_SOURCES := \
     $(LUNA_SPLASH_SRC)/render.c \
     $(LUNA_SPLASH_SRC)/ipc.c \
+    $(LUNA_SPLASH_SRC)/frames.c \
+    $(LUNA_SPLASH_SRC)/stb_image_impl.c \
     $(LUNA_SPLASH_SRC)/main.c
 
 LUNA_SPLASH_OBJECTS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(LUNA_SPLASH_SOURCES))
@@ -254,13 +256,13 @@ $(BUILD_DIR)/luna-init-ctl/%.o: $(LUNA_CTL_SRC)/%.c | $(BUILD_DIR)/luna-init-ctl
 
 $(BUILD_DIR)/luna-splash/luna-splash: $(LUNA_SPLASH_OBJECTS) | $(BUILD_DIR)/luna-splash
 	@echo "  LINK    $@"
-	$(CC) $(CFLAGS_STATIC) -o $@ $^
+	$(CC) $(CFLAGS_STATIC) -o $@ $^ -lm
 	@echo "  SIZE    luna-splash"
 	@size $@
 
 $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 	@echo "  CC      $<"
-	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -c -o $@ $<
+	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -DSTBI_ONLY_PNG -c -o $@ $<
 
 # ---------------------------------------------------------------------------
 # Rust applications (cross-compiled via cargo in WSL)

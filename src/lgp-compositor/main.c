@@ -617,8 +617,14 @@ static bool lgp_handle_client_message(lgp_compositor_state_t *state,
         bool ok = lgp_hello_handle(client, msg);
         if (ok) {
             if (client->caps_granted & LGP_CAP_WINDOW_MANAGER) {
-                state->wm_client = client;
-                LGP_INFO("ipc", "Client session=%u registered as Window Manager", client->session_id);
+                if (client->uid != 0) {
+                    LGP_WARN("ipc", "Non-root client session=%u tried to register as Window Manager (uid=%d)",
+                             client->session_id, (int)client->uid);
+                    client->caps_granted &= ~LGP_CAP_WINDOW_MANAGER;
+                } else {
+                    state->wm_client = client;
+                    LGP_INFO("ipc", "Client session=%u registered as Window Manager", client->session_id);
+                }
             }
             /* Send output geometry */
             uint8_t geom[LGP_HEADER_SIZE + 8];
@@ -773,6 +779,11 @@ int main(int argc, char **argv) {
 
     LGP_INFO("main", "Starting lgp-compositor (Mahina OS)");
 
+    /*
+     * Initialize compositor state.
+     * Note: global_clipboard is implicitly zero-initialized to all zeros
+     * by the C compiler because we use designated initializers.
+     */
     lgp_compositor_state_t state = {
         .epoll_fd = epoll_create1(EPOLL_CLOEXEC),
         .signal_fd = lgp_signal_init(),

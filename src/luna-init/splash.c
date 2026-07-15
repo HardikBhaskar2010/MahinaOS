@@ -42,12 +42,17 @@ void splash_start(void) {
         char fd_str[16];
         snprintf(fd_str, sizeof(fd_str), "%d", splash_pipe[0]);
         
-        const char *argv[] = { "/sbin/luna-splash", "--fd", fd_str, NULL };
+        const char *argv[] = {
+            "/sbin/luna-splash",
+            "--fd",     fd_str,
+            "--frames", "/usr/share/mahina/splash",
+            NULL
+        };
         const char *envp[] = { "PATH=/sbin:/bin:/usr/sbin:/usr/bin", NULL };
         
         execve("/sbin/luna-splash", (char * const *)argv, (char * const *)envp);
         
-        /* If execve fails, we might not have it in /sbin. Try local path for dev. */
+        /* Dev fallback */
         execve("./build/luna-splash/luna-splash", (char * const *)argv, (char * const *)envp);
         
         exit(1);

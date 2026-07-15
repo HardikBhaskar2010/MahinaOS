@@ -109,12 +109,50 @@ impl CalcApp {
     }
 
     fn eval_simple(&self, expr: &str) -> Option<f64> {
-        let tokens: Vec<&str> = expr.split(|c: char| "+-*/".contains(c)).collect();
-        let ops: Vec<char> = expr.chars().filter(|c| "+-*/".contains(*c)).collect();
+        let expr = expr.trim();
+        if expr.is_empty() { return None; }
+
+        let mut tokens = Vec::new();
+        let mut ops = Vec::new();
+
+        let chars: Vec<char> = expr.chars().collect();
+        let mut i = 0;
+
+        while i < chars.len() {
+            // Check if this is a sign (+ or -) rather than a binary operator.
+            // A sign is at index 0, or is preceded by another operator.
+            if (chars[i] == '-' || chars[i] == '+') && 
+               (i == 0 || "+-*/".contains(chars[i - 1])) {
+                // Parse a signed number
+                let mut num_str = String::new();
+                num_str.push(chars[i]);
+                i += 1;
+                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                    num_str.push(chars[i]);
+                    i += 1;
+                }
+                let val: f64 = num_str.parse().ok()?;
+                tokens.push(val);
+            } else if "+-*/".contains(chars[i]) {
+                ops.push(chars[i]);
+                i += 1;
+            } else if chars[i].is_ascii_digit() || chars[i] == '.' {
+                let mut num_str = String::new();
+                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
+                    num_str.push(chars[i]);
+                    i += 1;
+                }
+                let val: f64 = num_str.parse().ok()?;
+                tokens.push(val);
+            } else {
+                return None;
+            }
+        }
+
         if tokens.len() != ops.len() + 1 { return None; }
-        let mut val: f64 = tokens[0].parse().ok()?;
-        for (i, &op) in ops.iter().enumerate() {
-            let next: f64 = tokens[i + 1].parse().ok()?;
+        let mut val = tokens[0];
+        for (idx, &op) in ops.iter().enumerate() {
+            let next = tokens[idx + 1];
             match op {
                 '+' => val += next,
                 '-' => val -= next,

@@ -266,6 +266,11 @@ void install_worker_run(int pipe_fd, const install_config_t *cfg)
         snprintf(cmd, sizeof(cmd),
                  "cp /usr/share/wallpaper/* %s/usr/share/wallpaper/ 2>/dev/null || true", mnt);
         run_cmd(cmd);
+        /* Splash frame sequence */
+        snprintf(cmd, sizeof(cmd),
+                 "mkdir -p %s/usr/share/mahina/splash && "
+                 "cp /usr/share/mahina/splash/* %s/usr/share/mahina/splash/ 2>/dev/null || true", mnt, mnt);
+        run_cmd(cmd);
         /* Service TOML files */
         snprintf(cmd, sizeof(cmd),
                  "cp /etc/luna/services/* %s/etc/luna/services/ 2>/dev/null || true", mnt);

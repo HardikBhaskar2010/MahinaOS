@@ -44,6 +44,7 @@ impl TasksApp {
                     if let Ok(status) = std::fs::read_to_string(format!("/proc/{}/status", pid)) {
                         let mut pname = String::from("?");
                         let mut state = String::from("?");
+                        let mut mem = 0u64;
                         for line in status.lines() {
                             if line.starts_with("Name:") {
                                 pname = line[6..].trim().to_string();
@@ -51,13 +52,19 @@ impl TasksApp {
                             if line.starts_with("State:") {
                                 state = line[7..].trim().to_string();
                             }
+                            if line.starts_with("VmRSS:") {
+                                let parts: Vec<&str> = line[6..].split_whitespace().collect();
+                                if !parts.is_empty() {
+                                    mem = parts[0].parse().unwrap_or(0);
+                                }
+                            }
                         }
                         self.procs.push(ProcInfo {
                             pid,
                             name: pname,
                             state,
                             cpu: 0.0,
-                            mem: 0,
+                            mem,
                         });
                     }
                 }
@@ -78,7 +85,7 @@ impl TasksApp {
     fn render(&self, pixels: &mut [u8], stride: u32, width: u32, height: u32) {
         fill_rect_on_slice(pixels, stride, width, height, 0, 0, width as i32, height as i32, COLOR_BG);
 
-        draw_text_on_slice(pixels, stride, width, 8, 4, "PID   NAME                STATE", COLOR_ACCENT);
+        draw_text_on_slice(pixels, stride, width, 8, 4, "PID   NAME                STATE   MEM", COLOR_ACCENT);
         fill_rect_on_slice(pixels, stride, width, height, 0, 22, width as i32, 1, COLOR_RAISED);
 
         let top_y = 24;
@@ -99,7 +106,7 @@ impl TasksApp {
                 else { COLOR_DEAD };
 
             draw_text_on_slice(pixels, stride, width, 4, py,
-                &format!("{:<5} {:<20} {}", p.pid, p.name, p.state), state_color);
+                &format!("{:<5} {:<19} {:<7} {:>6}K", p.pid, p.name, p.state, p.mem), state_color);
         }
 
         draw_text_on_slice(pixels, stride, width, 8, height as i32 - 16,

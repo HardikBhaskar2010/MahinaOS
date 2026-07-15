@@ -61,6 +61,13 @@ fn main() -> std::io::Result<()> {
         | LGP_CAP_WINDOW_MANAGER;
 
     let mut conn = LgpConnection::connect(caps)?;
+    unsafe {
+        let fd = conn.as_raw_fd();
+        let flags = libc::fcntl(fd, libc::F_GETFD);
+        if flags >= 0 {
+            libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC);
+        }
+    }
     let sw = conn.output_width;
     let sh = conn.output_height;
 

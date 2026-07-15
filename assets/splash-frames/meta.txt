@@ -1,0 +1,4 @@
+frames=144
+width=1080
+height=1080
+fps=30

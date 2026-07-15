@@ -26,14 +26,14 @@
 #include <stdbool.h>
 #include <sys/signalfd.h>
 
-/* Signal actions dispatched from the epoll loop */
 typedef enum {
     SIGNAL_ACTION_NONE     = 0,
     SIGNAL_ACTION_REAP     = 1,  /* SIGCHLD — reap children    */
     SIGNAL_ACTION_SHUTDOWN = 2,  /* SIGTERM — orderly shutdown */
     SIGNAL_ACTION_REBOOT   = 3,  /* SIGINT  — orderly reboot   */
     SIGNAL_ACTION_RELOAD   = 4,  /* SIGHUP  — reload services  */
-    SIGNAL_ACTION_DUMP     = 5,  /* SIGUSR1 — dump state       */
+    SIGNAL_ACTION_READY    = 5,  /* SIGUSR1 — service ready    */
+    SIGNAL_ACTION_DUMP     = 6,  /* SIGUSR2 — dump state       */
 } signal_action_t;
 
 /*

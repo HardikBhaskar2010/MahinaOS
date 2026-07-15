@@ -91,6 +91,7 @@ impl FilesApp {
     }
 
     fn click_at(&mut self, y: i32) {
+        if y < 26 { return; }
         let idx = ((y - 26) / 20 + self.scroll / 20) as usize;
         if idx == 0 {
             self.go_up();
@@ -148,8 +149,15 @@ fn main() -> std::io::Result<()> {
                     }
                     t if t == LgpMessageType::KeyboardKey as u16 => {
                         if let Some(ev) = parse_keyboard_key(&msg.payload) {
-                            if ev.pressed && ev.key == 0x70029 {
-                                return Ok(());
+                            if ev.pressed {
+                                if ev.key == 0x70029 {
+                                    return Ok(());
+                                } else if ev.key == 0x70052 { // Up
+                                    app.scroll = (app.scroll - 20).max(0);
+                                } else if ev.key == 0x70051 { // Down
+                                    let max_scroll = ((app.entries.len() as i32 + 1) * 20 - 434).max(0);
+                                    app.scroll = (app.scroll + 20).min(max_scroll);
+                                }
                             }
                         }
                     }

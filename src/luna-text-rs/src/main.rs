@@ -42,6 +42,21 @@ impl TextEditor {
         }
     }
 
+    fn save_file(&mut self) -> std::io::Result<()> {
+        let content = self.lines.join("\n");
+        let path = if self.filename == "[Untitled]" {
+            "/tmp/luna-text-buffer.txt"
+        } else {
+            &self.filename
+        };
+        std::fs::write(path, content)?;
+        self.modified = false;
+        if self.filename == "[Untitled]" {
+            self.filename = path.to_string();
+        }
+        Ok(())
+    }
+
     fn insert_char(&mut self, ch: char) {
         let line = &mut self.lines[self.cursor_y];
         if self.cursor_x <= line.len() {
@@ -170,6 +185,17 @@ fn main() -> std::io::Result<()> {
 
     let mut editor = TextEditor::new();
 
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 {
+        let path = &args[1];
+        if let Ok(content) = std::fs::read_to_string(path) {
+            let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+            editor.lines = if lines.is_empty() { vec![String::new()] } else { lines };
+            editor.filename = path.clone();
+            editor.modified = false;
+        }
+    }
+
     loop {
         {
             let pixels = surface.pixels();
@@ -191,6 +217,12 @@ fn main() -> std::io::Result<()> {
                     t if t == LgpMessageType::KeyboardKey as u16 => {
                         if let Some(ev) = parse_keyboard_key(&msg.payload) {
                             if !ev.pressed { continue; }
+
+                            // Check Ctrl+S (key 0x70016 = S, modifier 0x2 = LGP_MOD_CTRL)
+                            if ev.key == 0x70016 && (ev.modifiers & 0x2) != 0 {
+                                let _ = editor.save_file();
+                                continue;
+                            }
 
                             match editor.mode {
                                 EditorMode::Insert => {

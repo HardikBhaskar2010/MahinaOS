@@ -135,15 +135,18 @@ impl LgpSurface {
 
 impl Drop for LgpSurface {
     fn drop(&mut self) {
-        if !self.buffer_map.is_null() {
-            unsafe {
-                libc::munmap(self.buffer_map as *mut libc::c_void, self.buffer_size);
-            }
-        }
+        /*
+         * Safety: Drop is correct. pixels() returns a raw slice pointing to buffer_map
+         * which we munmap here. There is no Vec-backed buffer storage issue.
+         * We call unmap_buffer() which handles safety and nulls the pointer to prevent
+         * double-unmapping.
+         */
+        self.unmap_buffer();
         if self.buffer_fd >= 0 {
             unsafe {
                 libc::close(self.buffer_fd);
             }
+            self.buffer_fd = -1;
         }
     }
 }

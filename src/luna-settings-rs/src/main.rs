@@ -85,8 +85,29 @@ impl SettingsApp {
 
     fn render_audio(&self, pixels: &mut [u8], stride: u32, width: u32, x: i32, y: i32, _w: i32) {
         draw_text_on_slice(pixels, stride, width, x, y, "Audio Settings", COLOR_TEXT);
-        draw_text_on_slice(pixels, stride, width, x, y + 24, "Volume: 75%", COLOR_TEXT_SEC);
-        draw_text_on_slice(pixels, stride, width, x, y + 48, "Output: Default", COLOR_TEXT_SEC);
+        
+        let mut device_name = None;
+        if let Ok(cards) = std::fs::read_to_string("/proc/asound/cards") {
+            for line in cards.lines() {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() && trimmed.chars().next().unwrap().is_ascii_digit() {
+                    if let Some(start) = trimmed.find('[') {
+                        if let Some(end) = trimmed.find(']') {
+                            let name = trimmed[start + 1..end].trim().to_string();
+                            device_name = Some(name);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(name) = device_name {
+            draw_text_on_slice(pixels, stride, width, x, y + 24, &format!("Device: {}", name), COLOR_TEXT_SEC);
+            draw_text_on_slice(pixels, stride, width, x, y + 48, "Volume: 75% (requires amixer)", COLOR_TEXT_SEC);
+        } else {
+            draw_text_on_slice(pixels, stride, width, x, y + 24, "No audio device detected", COLOR_TEXT_SEC);
+        }
     }
 
     fn render_users(&self, pixels: &mut [u8], stride: u32, width: u32, x: i32, y: i32, _w: i32) {
@@ -187,5 +208,3 @@ fn main() -> std::io::Result<()> {
         }
     }
 }
-
-fn _dummy() {}

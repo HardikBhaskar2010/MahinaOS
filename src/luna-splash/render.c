@@ -289,3 +289,77 @@ void render_progress(const char *msg, int percent) {
         }
     }
 }
+
+/*
+ * render_overlay_progress() — composite a progress bar on top of the current
+ * framebuffer (video frame) without erasing it.
+ *
+ * A semi-transparent dark band covers the bottom 15% of the screen.
+ * Text and the progress bar sit inside that band.
+ *
+ * Only implemented for 32bpp (shadow_fb available); no-ops gracefully for
+ * other depths since the video frame path also only runs at 32bpp.
+ */
+void render_overlay_progress(const char *msg, int percent) {
+    if (!fb_mem || vinfo.bits_per_pixel != 32) return;
+
+    /* Band occupies the bottom 15% of the screen */
+    int band_y = screen_h * 85 / 100;
+    int band_h = screen_h - band_y;
+
+    /* Alpha-blend each pixel in the band: 55% original + 45% black.
+     * This darkens the area enough to read white text against any video
+     * frame colour without completely hiding the animation beneath. */
+    for (int y = band_y; y < band_y + band_h; y++) {
+        for (int x = 0; x < screen_w; x++) {
+            int offset = y * (line_length / 4) + x;
+            uint32_t c = fb_mem[offset];
+
+            uint8_t r = ((c >> 16) & 0xFF) * 55 / 100;
+            uint8_t g = ((c >>  8) & 0xFF) * 55 / 100;
+            uint8_t b = ( c        & 0xFF) * 55 / 100;
+
+            uint32_t blended = ((uint32_t)r << 16)
+                             | ((uint32_t)g <<  8)
+                             |  (uint32_t)b;
+            fb_mem[offset] = blended;
+            if (shadow_fb) shadow_fb[offset] = blended;
+        }
+    }
+
+    /* Status text — one line above the progress bar */
+    int text_y = band_y + (band_h / 4);
+    render_text_centered(text_y, msg, COLOR_TEXT);
+
+    /* Progress bar — centred in the lower half of the band */
+    int bar_w = screen_w * 60 / 100;   /* 60% of screen width */
+    int bar_h = 8;
+    int bar_x = (screen_w - bar_w) / 2;
+    int bar_y = band_y + (band_h / 2);
+
+    /* Bar background */
+    for (int y = bar_y; y < bar_y + bar_h; y++)
+        for (int x = bar_x; x < bar_x + bar_w; x++)
+            put_pixel(x, y, COLOR_BAR_BG);
+
+    /* Bar fill */
+    int fill_w = (bar_w * percent) / 100;
+    for (int y = bar_y; y < bar_y + bar_h; y++)
+        for (int x = bar_x; x < bar_x + fill_w; x++)
+            put_pixel(x, y, COLOR_BRAND);
+}
+
+/* ── Framebuffer accessors ───────────────────────────────────────────────── */
+
+void *render_get_fb_mem(void) {
+    return fb_mem;
+}
+
+int render_get_stride(void) {
+    /* line_length is in bytes; return stride in pixels for 32bpp.
+     * For other depths this returns bytes/4 which frames.c will use
+     * as a uint32_t stride — frames.c only activates in 32bpp mode. */
+    return line_length / 4;
+}
+
+

@@ -503,21 +503,38 @@ int supervisor_stop_one(const char *name) {
 
     kill(svc->pid, svc->stop_signal);
 
+    /* Non-blocking wait: poll with WNOHANG so PID 1's event loop is not
+     * blocked during service stop. We iterate with short nanosleeps rather
+     * than a blocking waitpid() call, capped at stop_timeout_ms total.
+     * (Fixes audit Issue 16 — busy-poll usleep was blocking PID 1) */
     long long start = now_ms();
-    while (now_ms() - start < svc->stop_timeout_ms) {
-        if (kill(svc->pid, 0) != 0) { /* process gone */
+    while (now_ms() - start < (long long)svc->stop_timeout_ms) {
+        int wstatus = 0;
+        pid_t ret = waitpid(svc->pid, &wstatus, WNOHANG);
+        if (ret == svc->pid) {
+            /* Process has exited cleanly */
             svc->state = SERVICE_STATE_STOPPED;
             svc->pid   = 0;
             LUNA_INFO(COMP, "Service '%s' stopped", name);
             return 0;
         }
-        sleep_ms(50);
+        if (ret < 0 && errno != EINTR) {
+            /* Process already gone (ECHILD) */
+            svc->state = SERVICE_STATE_STOPPED;
+            svc->pid   = 0;
+            return 0;
+        }
+        /* Yield for 20ms without holding a blocking syscall */
+        struct timespec nap = { .tv_sec = 0, .tv_nsec = 20000000L };
+        nanosleep(&nap, NULL);
     }
 
     /* Timeout — SIGKILL */
     LUNA_WARN(COMP, "Service '%s' did not stop in %dms — sending SIGKILL",
               name, svc->stop_timeout_ms);
     kill(svc->pid, SIGKILL);
+    /* One final non-blocking reap */
+    waitpid(svc->pid, NULL, WNOHANG);
     svc->state = SERVICE_STATE_STOPPED;
     svc->pid   = 0;
     return 0;

@@ -12,12 +12,9 @@ use crate::widgets::read_realtime;
 
 /// Verify password against Unix shadow file hash using libc::crypt.
 /// Musl libc statically links this function without external dynamic PAM library dependencies.
-fn verify_shadow_password(username: &str, password: &str) -> bool {
+fn verify_shadow_password(username: &str, password: &str) -> Result<bool, std::io::Error> {
     // 1. Read /etc/shadow
-    let shadow_content = match std::fs::read_to_string("/etc/shadow") {
-        Ok(c) => c,
-        Err(_) => return fallback_pin_auth(password), // Fallback to PIN if shadow is unreadable
-    };
+    let shadow_content = std::fs::read_to_string("/etc/shadow")?;
 
     // 2. Find target user entry
     let mut shadow_hash = None;
@@ -33,23 +30,23 @@ fn verify_shadow_password(username: &str, password: &str) -> bool {
 
     let hash = match shadow_hash {
         Some(h) => h,
-        None => return fallback_pin_auth(password),
+        None => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "User not found in shadow")),
     };
 
     // If password hash is empty, locked, or disabled (e.g. *, !, etc.)
     if hash == "" || hash == "*" || hash == "!" {
-        return password.is_empty();
+        return Ok(password.is_empty());
     }
 
     // 3. Compute crypt(password, salt)
     use std::ffi::{CString, CStr};
     let c_password = match CString::new(password) {
         Ok(s) => s,
-        Err(_) => return false,
+        Err(_) => return Ok(false),
     };
     let c_hash = match CString::new(hash.as_str()) {
         Ok(s) => s,
-        Err(_) => return false,
+        Err(_) => return Ok(false),
     };
 
     static CRYPT_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -62,10 +59,10 @@ fn verify_shadow_password(username: &str, password: &str) -> bool {
     unsafe {
         let res_ptr = crypt(c_password.as_ptr(), c_hash.as_ptr());
         if res_ptr.is_null() {
-            return false;
+            return Ok(false);
         }
         let res_str = CStr::from_ptr(res_ptr).to_string_lossy();
-        res_str == hash
+        Ok(res_str == hash)
     }
 }
 
@@ -188,23 +185,43 @@ impl LockScreen {
     }
 
     fn try_unlock(&mut self) -> bool {
-        if verify_shadow_password(&self.username, &self.input) {
-            self.locked = false;
-            self.input.clear();
-            self.failed_attempts = 0;
-            self.failed_msg = None;
-            self.idle_ticks = 0;
-            true
-        } else {
-            self.failed_attempts += 1;
-            self.shake_timer = SHAKE_FRAMES;
-            self.input.clear();
-            self.failed_msg = Some(format!(
-                "Incorrect password ({} attempt{})",
-                self.failed_attempts,
-                if self.failed_attempts == 1 { "" } else { "s" }
-            ));
-            false
+        match verify_shadow_password(&self.username, &self.input) {
+            Ok(true) => {
+                self.locked = false;
+                self.input.clear();
+                self.failed_attempts = 0;
+                self.failed_msg = None;
+                self.idle_ticks = 0;
+                true
+            }
+            Ok(false) => {
+                self.failed_attempts += 1;
+                self.shake_timer = SHAKE_FRAMES;
+                self.input.clear();
+                self.failed_msg = Some(format!(
+                    "Incorrect password ({} attempt{})",
+                    self.failed_attempts,
+                    if self.failed_attempts == 1 { "" } else { "s" }
+                ));
+                false
+            }
+            Err(e) => {
+                eprintln!("[lockscreen] Shadow read failed: {}", e);
+                if fallback_pin_auth(&self.input) {
+                    self.locked = false;
+                    self.input.clear();
+                    self.failed_attempts = 0;
+                    self.failed_msg = None;
+                    self.idle_ticks = 0;
+                    true
+                } else {
+                    self.failed_attempts += 1;
+                    self.shake_timer = SHAKE_FRAMES;
+                    self.input.clear();
+                    self.failed_msg = Some("Shadow read failed — use PIN".to_string());
+                    false
+                }
+            }
         }
     }
 

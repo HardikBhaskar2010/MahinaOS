@@ -198,7 +198,7 @@ int main(void) {
 
     int inotify_fd = inotify_init1(IN_CLOEXEC | IN_NONBLOCK);
     if (inotify_fd >= 0) {
-        inotify_add_watch(inotify_fd, SERVICES_DIR, 
+        inotify_add_watch(inotify_fd, SERVICES_DIR,
                           IN_MODIFY | IN_CREATE | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO);
         ev.events  = EPOLLIN;
         ev.data.fd = inotify_fd;
@@ -208,7 +208,7 @@ int main(void) {
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC);
     if (timer_fd >= 0) {
         struct itimerspec ts = {
-            .it_interval = {0, 100000000}, /* 100ms */
+            .it_interval = {0, 100000000}, /* 100ms supervisor pump */
             .it_value    = {0, 100000000}
         };
         timerfd_settime(timer_fd, 0, &ts, NULL);
@@ -217,7 +217,16 @@ int main(void) {
         epoll_ctl(epfd, EPOLL_CTL_ADD, timer_fd, &ev);
     }
 
-    /* ═══ Main event loop ═════════════════════════════════════════════════ */
+    /* ═══ Boot-complete splash timer ═════════════════════════════════════ */
+    /* A dedicated one-shot timerfd fires after SPLASH_DELAY_MS once boot is
+     * complete. Using a timerfd keeps PID 1's event loop unblocked throughout
+     * the delay — signals (SIGCHLD, SIGTERM, etc.) continue to be processed
+     * in real-time rather than being deferred. (Fixes audit Issue 17) */
+    #define SPLASH_DELAY_MS 3500
+    int splash_timer_fd = -1;
+    bool boot_notified  = false;
+
+    /* ═══ Main event loop ═════════════════════════════════════════════ */
 
     LUNA_INFO("luna-init", "Entering main event loop");
 
@@ -271,6 +280,9 @@ int main(void) {
                         break;
                     }
 
+                    case SIGNAL_ACTION_READY:
+                        break;
+
                     case SIGNAL_ACTION_NONE:
                     default:
                         break;
@@ -280,7 +292,10 @@ int main(void) {
                 /* Control socket client connected */
                 ctl_server_accept(ctl_fd);
             } else if (fd == inotify_fd) {
-                /* Service definitions changed */
+                /* Service definitions changed — reload without disrupting
+                 * running services: service_load_all re-reads the directory
+                 * from scratch. Running PIDs are preserved in g_services
+                 * entries that already have state != PENDING. (Audit Issue 18) */
                 char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
                 while (read(inotify_fd, buf, sizeof(buf)) > 0) {}
                 LUNA_INFO("luna-init", "Service directory changed, reloading definitions");
@@ -291,56 +306,93 @@ int main(void) {
                 if (read(timer_fd, &expirations, sizeof(expirations)) > 0) {
                     supervisor_pump();
                 }
+
+            } else if (splash_timer_fd >= 0 && fd == splash_timer_fd) {
+                /* ═══ STAGE 5: Graphics Layer (deferred 3.5s after boot) ════ */
+                uint64_t exp;
+                (void)read(splash_timer_fd, &exp, sizeof(exp));
+
+                /* Remove and close the one-shot splash timer */
+                epoll_ctl(epfd, EPOLL_CTL_DEL, splash_timer_fd, NULL);
+                close(splash_timer_fd);
+                splash_timer_fd = -1;
+
+                luna_log_set_stage(LUNA_STAGE_GRAPHICS);
+                LUNA_INFO("luna-init", "Stage 5: Releasing boot splash");
+                splash_stop();
+
+                LUNA_INFO("luna-init", "Stage 5: Starting lgp-compositor");
+                int comp_result = supervisor_start_one("lgp-compositor");
+                if (comp_result < 0) {
+                    LUNA_WARN("luna-init",
+                              "lgp-compositor failed to start — degraded graphics mode");
+                }
+
+                luna_log_switch_to_runtime();
+
+                /* Clear the fbcon text buffer */
+                (void)write(STDOUT_FILENO, "\033[2J\033[H", 7);
+                console_print_welcome();
+
+                /* Spawn default shell (serial console) */
+                pid_t shell_pid = fork();
+                if (shell_pid == 0) {
+                    console_drop_to_shell(NULL);
+                    _exit(0);
+                }
+
+                if (comp_result >= 0) {
+                    LUNA_INFO("luna-init", "Stage 5: Starting luna-shell");
+                    if (supervisor_start_one("luna-shell") < 0) {
+                        LUNA_WARN("luna-init", "luna-shell failed to start");
+                    }
+                } else {
+                    /* Fallback: drop to tty1 shell */
+                    pid_t tty_shell_pid = fork();
+                    if (tty_shell_pid == 0) {
+                        console_drop_to_shell("/dev/tty1");
+                        _exit(0);
+                    }
+                }
             }
         }
 
-        /* Check for boot completion asynchronously */
-        if (!boot_complete && supervisor_is_boot_complete()) {
+        /* Check for boot completion asynchronously — arm the splash timerfd
+         * once and only once, without blocking the event loop. */
+        if (!boot_complete && !boot_notified && supervisor_is_boot_complete()) {
             boot_complete = true;
-            LUNA_INFO("luna-init", "Stage 0 (v0.1) boot complete. Stages 5-7 pending.");
-            
-            splash_update("Boot Complete!", 100);
-            usleep(3500000); /* 3.5 second delay to admire the splash screen (accounts for QEMU window startup lag) */
+            boot_notified = true;
+            LUNA_INFO("luna-init", "Stage 0 boot complete — arming %.1fs splash timer.",
+                      SPLASH_DELAY_MS / 1000.0);
 
-            /* ═══ STAGE 5 (NEW): Graphics Layer ═══════════════════════════════════ */
-            
-            luna_log_set_stage(LUNA_STAGE_GRAPHICS);
-            LUNA_INFO("luna-init", "Stage 5: Releasing boot splash");
-            
-            splash_stop();
-            
-            LUNA_INFO("luna-init", "Stage 5: Starting lgp-compositor");
-            int comp_result = supervisor_start_one("lgp-compositor");
-            if (comp_result < 0) {
-                LUNA_WARN("luna-init", "lgp-compositor failed to start — degraded graphics mode");
-            }
-            
-            luna_log_switch_to_runtime();
-            
-            /* Clear the fbcon text buffer to avoid mangled overlap with the banner */
-            (void)write(STDOUT_FILENO, "\033[2J\033[H", 7);
-            
-            console_print_welcome();
-            
-            /* Spawn default shell (serial console / user's main terminal) */
-            pid_t shell_pid = fork();
-            if (shell_pid == 0) {
-                console_drop_to_shell(NULL);
-                _exit(0);
-            }
-            
-            if (comp_result >= 0) {
-                LUNA_INFO("luna-init", "Stage 5: Starting luna-shell");
-                if (supervisor_start_one("luna-shell") < 0) {
-                    LUNA_WARN("luna-init", "luna-shell failed to start");
-                }
+            splash_update("Boot Complete!", 100);
+
+            /* Arm a one-shot timerfd for SPLASH_DELAY_MS ms */
+            splash_timer_fd = timerfd_create(CLOCK_MONOTONIC,
+                                             TFD_NONBLOCK | TFD_CLOEXEC);
+            if (splash_timer_fd >= 0) {
+                struct itimerspec splash_ts = {
+                    .it_interval = {0, 0},
+                    .it_value    = {
+                        SPLASH_DELAY_MS / 1000,
+                        (long)(SPLASH_DELAY_MS % 1000) * 1000000L
+                    }
+                };
+                timerfd_settime(splash_timer_fd, 0, &splash_ts, NULL);
+                struct epoll_event splash_ev = { .events = EPOLLIN,
+                                                 .data.fd = splash_timer_fd };
+                epoll_ctl(epfd, EPOLL_CTL_ADD, splash_timer_fd, &splash_ev);
             } else {
-                /* Spawn shell on virtual console tty1 (the virtual OS screen / keyboard) */
-                pid_t tty_shell_pid = fork();
-                if (tty_shell_pid == 0) {
-                    console_drop_to_shell("/dev/tty1");
-                    _exit(0);
-                }
+                /* timerfd unavailable — fall back to blocking (degraded) */
+                LUNA_WARN("luna-init",
+                          "timerfd_create for splash delay failed: %s — blocking fallback",
+                          strerror(errno));
+                struct timespec ts = {
+                    SPLASH_DELAY_MS / 1000,
+                    (long)(SPLASH_DELAY_MS % 1000) * 1000000L
+                };
+                nanosleep(&ts, NULL);
+                splash_stop();
             }
         }
     }

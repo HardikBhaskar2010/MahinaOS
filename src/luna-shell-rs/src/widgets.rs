@@ -30,6 +30,17 @@ pub fn read_realtime() -> (u8, u8, u8) {
         return (h, m, s);
     }
 
+    // Try /sys/class/rtc/rtc0/time (format: HH:MM:SS\n)
+    if let Ok(rtc_time) = std::fs::read_to_string("/sys/class/rtc/rtc0/time") {
+        let parts: Vec<&str> = rtc_time.trim().split(':').collect();
+        if parts.len() >= 3 {
+            let h = parts[0].parse().unwrap_or(0);
+            let m = parts[1].parse().unwrap_or(0);
+            let s = parts[2].parse().unwrap_or(0);
+            return (h, m, s);
+        }
+    }
+
     // Fall back: derive from uptime (seconds since boot % 86400)
     let uptime_secs = read_uptime_secs();
     let secs_in_day = (uptime_secs as u64) % 86400;

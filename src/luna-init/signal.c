@@ -32,6 +32,7 @@ int signal_init(void) {
     sigaddset(&mask, SIGINT);
     sigaddset(&mask, SIGHUP);
     sigaddset(&mask, SIGUSR1);
+    sigaddset(&mask, SIGUSR2);
 
     /* Block the signal mask process-wide — signalfd will receive them */
     if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0) {
@@ -82,8 +83,12 @@ signal_action_t signal_read(int sigfd) {
             return SIGNAL_ACTION_RELOAD;
 
         case SIGUSR1:
-            LUNA_INFO(COMP, "SIGUSR1 received from PID %u", info.ssi_pid);
+            LUNA_INFO(COMP, "SIGUSR1 received from PID %u — service ready", info.ssi_pid);
             supervisor_signal_ready(info.ssi_pid);
+            return SIGNAL_ACTION_READY;
+
+        case SIGUSR2:
+            LUNA_INFO(COMP, "SIGUSR2 received from PID %u — dumping state", info.ssi_pid);
             return SIGNAL_ACTION_DUMP;
 
         default:
