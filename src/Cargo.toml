@@ -11,6 +11,7 @@ members = [
     "luna-tasks-rs",
     "luna-about-rs",
     "luna-island-rs",
+    "luna-setup-rs",
 ]
 
 [profile.release]

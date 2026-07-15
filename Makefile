@@ -254,8 +254,8 @@ $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 
 RUST_SRC_DIR := $(SRC_DIR)
 RUST_TARGET_DIR := $(RUST_SRC_DIR)/target/x86_64-unknown-linux-musl/release
-RUST_BINARIES := luna-shell settings-rs files-rs calc-rs text-rs tasks-rs about-rs luna-island
-RUST_BIN_DIRS  := luna-shell-rs luna-settings-rs luna-files-rs luna-calc-rs luna-text-rs luna-tasks-rs luna-about-rs luna-island-rs
+RUST_BINARIES := luna-shell settings-rs files-rs calc-rs text-rs tasks-rs about-rs luna-island luna-setup
+RUST_BIN_DIRS  := luna-shell-rs luna-settings-rs luna-files-rs luna-calc-rs luna-text-rs luna-tasks-rs luna-about-rs luna-island-rs luna-setup-rs
 
 .PHONY: rust-apps rust-clean
 rust-apps: $(addprefix $(BUILD_DIR)/rust/,$(RUST_BINARIES))
