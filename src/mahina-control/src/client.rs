@@ -1,6 +1,8 @@
 use crate::daemon::DEFAULT_SOCKET_PATH;
 use crate::error::ControlError;
-use crate::protocol::{Request, Response, ServiceEntry, ServiceStatus, SystemState, UserEntry};
+use crate::protocol::{
+    PackageEntry, Request, Response, ServiceEntry, ServiceStatus, SystemState, UserEntry,
+};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -146,5 +148,33 @@ impl ControlClient {
         let val = self.call("users.list", serde_json::json!({}), None, None)?;
         let list: Vec<UserEntry> = serde_json::from_value(val)?;
         Ok(list)
+    }
+
+    pub fn packages_list(&mut self) -> Result<Vec<PackageEntry>, ControlError> {
+        let val = self.call("packages.list", serde_json::json!({}), None, None)?;
+        let list: Vec<PackageEntry> = serde_json::from_value(val)?;
+        Ok(list)
+    }
+
+    pub fn packages_install(&mut self, target: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "packages.install",
+            serde_json::json!({ "target": target }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Installed").to_string();
+        Ok(msg)
+    }
+
+    pub fn packages_remove(&mut self, name: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "packages.remove",
+            serde_json::json!({ "name": name }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Removed").to_string();
+        Ok(msg)
     }
 }

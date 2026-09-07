@@ -83,6 +83,15 @@ pub struct UserEntry {
     pub groups: Vec<String>,
 }
 
+/// Strongly typed installed package entry
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PackageEntry {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub file_count: usize,
+}
+
 /// Strongly typed internal domain commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainCommand {
@@ -96,6 +105,9 @@ pub enum DomainCommand {
     ServicesRestart { name: String },
     ServicesReload { name: String },
     UsersList,
+    PackagesList,
+    PackagesInstall { target: String },
+    PackagesRemove { name: String },
 }
 
 impl DomainCommand {
@@ -158,6 +170,31 @@ impl DomainCommand {
                 })
             }
             "users.list" => Ok(Self::UsersList),
+            "packages.list" => Ok(Self::PackagesList),
+            "packages.install" => {
+                let target = params
+                    .get("target")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "target".to_string(),
+                        reason: "Missing required parameter 'target'".to_string(),
+                    })?;
+                Ok(Self::PackagesInstall {
+                    target: target.to_string(),
+                })
+            }
+            "packages.remove" => {
+                let name = params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "name".to_string(),
+                        reason: "Missing required parameter 'name'".to_string(),
+                    })?;
+                Ok(Self::PackagesRemove {
+                    name: name.to_string(),
+                })
+            }
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -174,18 +211,27 @@ impl DomainCommand {
             Self::ServicesRestart { .. } => "services.restart",
             Self::ServicesReload { .. } => "services.reload",
             Self::UsersList => "users.list",
+            Self::PackagesList => "packages.list",
+            Self::PackagesInstall { .. } => "packages.install",
+            Self::PackagesRemove { .. } => "packages.remove",
         }
     }
 
     pub fn is_mutating(&self) -> bool {
         match self {
-            Self::SystemGetState | Self::ServicesList | Self::ServicesStatus { .. } | Self::UsersList => false,
+            Self::SystemGetState
+            | Self::ServicesList
+            | Self::ServicesStatus { .. }
+            | Self::UsersList
+            | Self::PackagesList => false,
             Self::SystemReboot
             | Self::SystemShutdown
             | Self::ServicesStart { .. }
             | Self::ServicesStop { .. }
             | Self::ServicesRestart { .. }
-            | Self::ServicesReload { .. } => true,
+            | Self::ServicesReload { .. }
+            | Self::PackagesInstall { .. }
+            | Self::PackagesRemove { .. } => true,
         }
     }
 }
@@ -209,6 +255,7 @@ pub enum DomainResult {
     ServicesList(Vec<ServiceEntry>),
     ServiceStatus(ServiceStatus),
     UsersList(Vec<UserEntry>),
+    PackagesList(Vec<PackageEntry>),
     SuccessMessage(String),
     Empty,
 }
@@ -220,6 +267,7 @@ impl DomainResult {
             Self::ServicesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::ServiceStatus(status) => serde_json::to_value(status).unwrap_or(serde_json::Value::Null),
             Self::UsersList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
+            Self::PackagesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }

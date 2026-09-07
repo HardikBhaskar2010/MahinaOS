@@ -27,7 +27,11 @@ fn print_help() {
          service restart <NAME>  Restart a service\n  \
          service reload <NAME>   Reload a service configuration (SIGHUP)\n\n\
          USER COMMANDS:\n  \
-         user list               List local user accounts and group memberships\n",
+         user list               List local user accounts and group memberships\n\n\
+         PACKAGE COMMANDS:\n  \
+         package list            List installed software packages\n  \
+         package install <TARGET> Install a package (.lpkg or repository package)\n  \
+         package remove <NAME>   Remove an installed package\n",
         DEFAULT_SOCKET_PATH
     );
 }
@@ -302,6 +306,59 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("Error: failed to list users: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("package") | Some("packages"), Some("list")) => {
+            match client.packages_list() {
+                Ok(pkgs) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&pkgs).unwrap_or_default());
+                    } else if pkgs.is_empty() {
+                        println!("No packages currently installed.");
+                    } else {
+                        println!("{:<20} {:<12} {:<8} {:<36}", "PACKAGE", "VERSION", "FILES", "DESCRIPTION");
+                        println!("{:-<20} {:-<12} {:-<8} {:-<36}", "", "", "", "");
+                        for p in pkgs {
+                            println!("{:<20} {:<12} {:<8} {:<36}", p.name, p.version, p.file_count, p.description);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to list packages: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("package") | Some("packages"), Some("install")) => {
+            let target = match target {
+                Some(t) => t,
+                None => {
+                    eprintln!("Error: package install requires a package target or file");
+                    process::exit(1);
+                }
+            };
+            match client.packages_install(target, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: package install failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("package") | Some("packages"), Some("remove")) => {
+            let name = match target {
+                Some(n) => n,
+                None => {
+                    eprintln!("Error: package remove requires a package name");
+                    process::exit(1);
+                }
+            };
+            match client.packages_remove(name, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: package remove failed: {}", e);
                     process::exit(1);
                 }
             }

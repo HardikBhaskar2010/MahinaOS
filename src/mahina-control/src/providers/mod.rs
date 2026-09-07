@@ -1,9 +1,11 @@
+pub mod package;
 pub mod service;
 pub mod system;
 pub mod user;
 
 use crate::error::ControlError;
 use crate::protocol::{DomainCommand, DomainResult};
+use self::package::PackageProvider;
 use self::service::ServiceProvider;
 use self::system::SystemProvider;
 use self::user::UserProvider;
@@ -12,6 +14,7 @@ pub struct ProviderDispatcher {
     pub system: SystemProvider,
     pub service: ServiceProvider,
     pub user: UserProvider,
+    pub package: PackageProvider,
 }
 
 impl ProviderDispatcher {
@@ -20,11 +23,22 @@ impl ProviderDispatcher {
             system: SystemProvider::new(),
             service: ServiceProvider::new(),
             user: UserProvider::new(),
+            package: PackageProvider::new(),
         }
     }
 
-    pub fn with_providers(system: SystemProvider, service: ServiceProvider, user: UserProvider) -> Self {
-        Self { system, service, user }
+    pub fn with_providers(
+        system: SystemProvider,
+        service: ServiceProvider,
+        user: UserProvider,
+        package: PackageProvider,
+    ) -> Self {
+        Self {
+            system,
+            service,
+            user,
+            package,
+        }
     }
 
     pub fn dispatch(&self, command: DomainCommand) -> Result<DomainResult, ControlError> {
@@ -68,6 +82,18 @@ impl ProviderDispatcher {
             DomainCommand::UsersList => {
                 let users = self.user.list()?;
                 Ok(DomainResult::UsersList(users))
+            }
+            DomainCommand::PackagesList => {
+                let packages = self.package.list()?;
+                Ok(DomainResult::PackagesList(packages))
+            }
+            DomainCommand::PackagesInstall { target } => {
+                let msg = self.package.install(&target)?;
+                Ok(DomainResult::SuccessMessage(msg))
+            }
+            DomainCommand::PackagesRemove { name } => {
+                let msg = self.package.remove(&name)?;
+                Ok(DomainResult::SuccessMessage(msg))
             }
         }
     }
