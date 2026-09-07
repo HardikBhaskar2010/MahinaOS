@@ -1,0 +1,14 @@
+# MahinaOS Rust Toolchain Pinning
+# Authority: Volume VII / 01_implementation_roadmap.md §0.1 Build Toolchain
+# Authority: Audit_08092026 §Biggest Problems / Rust toolchain pinning
+#
+# Pinned to Rust 1.80.1 (stable):
+# - Supports Cargo lockfile version 4 present in src/Cargo.lock
+# - Supports Rust 2021 edition workspace and libc 0.2.186
+# - Provides clippy, rustfmt, and static musl target for initramfs binaries
+
+[toolchain]
+channel = "1.80.1"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnu"]
+profile = "minimal"

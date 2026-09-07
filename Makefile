@@ -309,6 +309,9 @@ $(RUST_TARGET_DIR)/about-rs: $(wildcard $(RUST_SRC_DIR)/luna-about-rs/src/*.rs)
 $(RUST_TARGET_DIR)/luna-island: $(wildcard $(RUST_SRC_DIR)/luna-island-rs/src/*.rs)
 	$(CARGO_BUILD_CMD) -p luna-island-rs
 
+$(RUST_TARGET_DIR)/luna-setup: $(wildcard $(RUST_SRC_DIR)/luna-setup-rs/src/*.rs) $(wildcard $(RUST_SRC_DIR)/luna-setup-rs/src/**/*.rs)
+	$(CARGO_BUILD_CMD) -p luna-setup-rs
+
 $(BUILD_DIR)/rust/%: $(RUST_TARGET_DIR)/% | $(BUILD_DIR)/rust
 	@echo "  RUSTCP  $@"
 	cp $< $@

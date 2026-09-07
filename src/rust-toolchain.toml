@@ -1,0 +1,9 @@
+# MahinaOS Rust Toolchain Pinning
+# Authority: Volume VII / 01_implementation_roadmap.md §0.1 Build Toolchain
+# Authority: Audit_08092026 §Biggest Problems / Rust toolchain pinning
+
+[toolchain]
+channel = "1.80.1"
+components = ["rustfmt", "clippy"]
+targets = ["x86_64-unknown-linux-musl", "x86_64-unknown-linux-gnu"]
+profile = "minimal"
