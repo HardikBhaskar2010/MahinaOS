@@ -35,7 +35,7 @@ int frames_init(const char *dir);
 int frames_count(void);
 
 /*
- * frames_get_native_size() — Fill *w/*h with the video's native pixel size.
+ * frames_get_native_size() — Fill *w and *h with the video's native pixel size.
  * Filled from meta.txt if present, otherwise from the first PNG.
  */
 void frames_get_native_size(int *w, int *h);
