@@ -94,6 +94,25 @@ CFLAGS_FUZZ := \
     -fsanitize=fuzzer,address \
     -g
 
+# Vendored / third-party compiler flags (deliberately NOT compiled under first-party strict flags)
+# Authority: Audit_08092026 §Biggest Problems / Vendored Code Isolation
+VENDOR_CFLAGS := \
+    -std=c17 \
+    -Wall \
+    -O2 \
+    -fstack-protector-strong \
+    -D_GNU_SOURCE
+
+VENDOR_CFLAGS_STATIC := $(VENDOR_CFLAGS) -static
+
+VENDOR_CFLAGS_TEST := \
+    $(VENDOR_CFLAGS) \
+    -fsanitize=address,undefined \
+    -fno-omit-frame-pointer \
+    -fno-sanitize-recover=all \
+    -g \
+    -O1
+
 # Include paths
 INCLUDES := -I$(SRC_DIR)
 
@@ -244,6 +263,10 @@ $(BUILD_DIR)/luna-splash/luna-splash: $(LUNA_SPLASH_OBJECTS) | $(BUILD_DIR)/luna
 	@echo "  SIZE    luna-splash"
 	@size $@
 
+$(BUILD_DIR)/luna-splash/stb_image_impl.o: $(LUNA_SPLASH_SRC)/stb_image_impl.c | $(BUILD_DIR)/luna-splash
+	@echo "  CC (vendor) $<"
+	$(CC) $(VENDOR_CFLAGS_STATIC) $(INCLUDES) -DSTBI_ONLY_PNG -c -o $@ $<
+
 $(BUILD_DIR)/luna-splash/%.o: $(LUNA_SPLASH_SRC)/%.c | $(BUILD_DIR)/luna-splash
 	@echo "  CC      $<"
 	$(CC) $(CFLAGS_STATIC) $(INCLUDES) -DSTBI_ONLY_PNG -c -o $@ $<
@@ -378,8 +401,8 @@ test-unit: $(UNITY_OBJ) $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(
 	fi
 
 $(UNITY_OBJ): $(UNITY_SRC) | $(BUILD_DIR)/tests/vendor
-	@echo "  CC      unity.c"
-	$(CC) $(CFLAGS_TEST) -I$(TESTS_DIR)/vendor/unity -c -o $@ $<
+	@echo "  CC (vendor) unity.c"
+	$(CC) $(VENDOR_CFLAGS_TEST) -I$(TESTS_DIR)/vendor/unity -c -o $@ $<
 
 # Recompile luna-init sources with test flags (ASan enabled)
 $(BUILD_DIR)/luna-init/%_test_asan.o: $(LUNA_INIT_SRC)/%.c | $(BUILD_DIR)/luna-init
