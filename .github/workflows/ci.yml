@@ -23,17 +23,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
+      - name: Install toolchain and dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y clang lld llvm make libdrm-dev musl-tools
-          rustup target add x86_64-unknown-linux-musl || true
+          sudo apt-get install -y clang lld llvm make pkg-config libdrm-dev libinput-dev libudev-dev libsodium-dev musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          rustup component add clippy rustfmt
+
+      - name: Build Rust workspace (musl static)
+        run: |
+          cd src && RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --workspace --target x86_64-unknown-linux-musl
 
       - name: Build all targets
         run: make all CC=clang
 
-      - name: Check binary size (luna-init must fit in initramfs)
+      - name: Verify build artifacts and binary sizes
         run: |
+          set -e
+          test -s build/luna-init/luna-init
+          test -s build/luna-init-ctl/luna-init-ctl
+          test -s build/luna-splash/luna-splash
+          test -s build/lgp-compositor/lgp-compositor
+          test -s build/luna-ai-d/luna-ai-d
+          test -s build/lpkg/lpkg
           SIZE=$(stat -c%s build/luna-init/luna-init)
           echo "luna-init size: ${SIZE} bytes"
           # Hard limit: 4 MB. luna-init should be well under this.
@@ -61,10 +73,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
+      - name: Install toolchain and dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y clang lld llvm make libdrm-dev
+          sudo apt-get install -y clang lld llvm make pkg-config libdrm-dev libsodium-dev
 
       - name: Run unit tests
         run: make test-unit CC=clang
@@ -84,10 +96,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install toolchain
+      - name: Install toolchain and dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y clang clang-tidy
+          sudo apt-get install -y clang clang-tidy pkg-config libdrm-dev libinput-dev libudev-dev
 
       - name: Run clang-tidy
         run: make lint CC=clang
@@ -126,7 +138,7 @@ jobs:
       - name: Install toolchain and dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y clang lld llvm make qemu-system-x86 ovmf parted dosfstools btrfs-progs bzip2 libdrm-dev
+          sudo apt-get install -y clang lld llvm make qemu-system-x86 ovmf parted dosfstools btrfs-progs bzip2 pkg-config libdrm-dev libinput-dev libudev-dev libsodium-dev musl-tools
 
       - name: Run verification boot test
         run: |
