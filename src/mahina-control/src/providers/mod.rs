@@ -1,22 +1,26 @@
+pub mod service;
 pub mod system;
 
 use crate::error::ControlError;
 use crate::protocol::{DomainCommand, DomainResult};
+use self::service::ServiceProvider;
 use self::system::SystemProvider;
 
 pub struct ProviderDispatcher {
     pub system: SystemProvider,
+    pub service: ServiceProvider,
 }
 
 impl ProviderDispatcher {
     pub fn new() -> Self {
         Self {
             system: SystemProvider::new(),
+            service: ServiceProvider::new(),
         }
     }
 
-    pub fn with_system(system: SystemProvider) -> Self {
-        Self { system }
+    pub fn with_providers(system: SystemProvider, service: ServiceProvider) -> Self {
+        Self { system, service }
     }
 
     pub fn dispatch(&self, command: DomainCommand) -> Result<DomainResult, ControlError> {
@@ -32,6 +36,30 @@ impl ProviderDispatcher {
             DomainCommand::SystemShutdown => {
                 self.system.shutdown()?;
                 Ok(DomainResult::SuccessMessage("Shutdown initiated".to_string()))
+            }
+            DomainCommand::ServicesList => {
+                let services = self.service.list()?;
+                Ok(DomainResult::ServicesList(services))
+            }
+            DomainCommand::ServicesStatus { name } => {
+                let status = self.service.status(name.as_deref())?;
+                Ok(DomainResult::ServiceStatus(status))
+            }
+            DomainCommand::ServicesStart { name } => {
+                self.service.start(&name)?;
+                Ok(DomainResult::SuccessMessage(format!("Service '{}' started successfully", name)))
+            }
+            DomainCommand::ServicesStop { name } => {
+                self.service.stop(&name)?;
+                Ok(DomainResult::SuccessMessage(format!("Service '{}' stopped successfully", name)))
+            }
+            DomainCommand::ServicesRestart { name } => {
+                self.service.restart(&name)?;
+                Ok(DomainResult::SuccessMessage(format!("Service '{}' restarted successfully", name)))
+            }
+            DomainCommand::ServicesReload { name } => {
+                self.service.reload(&name)?;
+                Ok(DomainResult::SuccessMessage(format!("Service '{}' reloaded successfully", name)))
             }
         }
     }

@@ -100,8 +100,10 @@ impl CapabilityAuthorizer {
         let tier = IdentityTier::from_uid(peer.uid);
 
         match command {
-            // Read-only system state: accessible to any caller with socket transport access
-            DomainCommand::SystemGetState => Ok(tier),
+            // Read-only system state & service queries: accessible to any caller with socket transport access
+            DomainCommand::SystemGetState | DomainCommand::ServicesList | DomainCommand::ServicesStatus { .. } => {
+                Ok(tier)
+            }
 
             // Privileged mutating operations: requires root/admin or valid capability token
             DomainCommand::SystemReboot | DomainCommand::SystemShutdown => {
@@ -109,19 +111,45 @@ impl CapabilityAuthorizer {
                     return Ok(tier);
                 }
 
-                // In M3.1: Token interface validation
                 if let Some(t) = token {
                     if t.is_empty() {
                         return Err(ControlError::TokenInvalid("Empty capability token".to_string()));
                     }
-                    // Full signature verification added in M3.2+
                     Err(ControlError::PermissionDenied(
-                        "Capability tokens for system power control require Tier 1 human confirmation".to_string()
+                        "Capability tokens for system power control require Tier 1 human confirmation".to_string(),
                     ))
                 } else {
                     Err(ControlError::PermissionDenied(format!(
                         "Caller '{}' (UID {}) lacks authority for '{}'. Requires root or Capability Token.",
                         tier.as_str(), peer.uid, command.method_name()
+                    )))
+                }
+            }
+
+            DomainCommand::ServicesStart { name }
+            | DomainCommand::ServicesStop { name }
+            | DomainCommand::ServicesRestart { name }
+            | DomainCommand::ServicesReload { name } => {
+                if tier.is_privileged() {
+                    return Ok(tier);
+                }
+
+                if let Some(t) = token {
+                    if t.is_empty() {
+                        return Err(ControlError::TokenInvalid("Empty capability token".to_string()));
+                    }
+                    if t.contains("services.mutate") || t.contains(&format!("service:{}", name)) {
+                        Ok(tier)
+                    } else {
+                        Err(ControlError::PermissionDenied(format!(
+                            "Capability token lacks required scope for service '{}'",
+                            name
+                        )))
+                    }
+                } else {
+                    Err(ControlError::PermissionDenied(format!(
+                        "Caller '{}' (UID {}) lacks authority to mutate service '{}'. Requires root or Capability Token.",
+                        tier.as_str(), peer.uid, name
                     )))
                 }
             }
@@ -150,8 +178,11 @@ mod tests {
         assert!(auth_res.is_ok());
 
         let ai_peer = PeerCredentials::new(101, 950, 950);
-        let auth_res = CapabilityAuthorizer::authorize(&ai_peer, &DomainCommand::SystemGetState, None);
+        let auth_res = CapabilityAuthorizer::authorize(&ai_peer, &DomainCommand::ServicesList, None);
         assert!(auth_res.is_ok());
+
+        let status_cmd = DomainCommand::ServicesStatus { name: Some("udev".to_string()) };
+        assert!(CapabilityAuthorizer::authorize(&user_peer, &status_cmd, None).is_ok());
     }
 
     #[test]
@@ -167,5 +198,29 @@ mod tests {
             ControlError::PermissionDenied(msg) => assert!(msg.contains("lacks authority")),
             _ => panic!("expected permission denied"),
         }
+    }
+
+    #[test]
+    fn test_service_mutation_authorization() {
+        let root_peer = PeerCredentials::new(1, 0, 0);
+        let start_cmd = DomainCommand::ServicesStart { name: "dbus".to_string() };
+        assert!(CapabilityAuthorizer::authorize(&root_peer, &start_cmd, None).is_ok());
+
+        let ai_peer = PeerCredentials::new(101, 950, 950);
+        // Denied without token
+        let denied = CapabilityAuthorizer::authorize(&ai_peer, &start_cmd, None);
+        assert!(denied.is_err());
+
+        // Allowed with proper scoped token
+        let allowed = CapabilityAuthorizer::authorize(&ai_peer, &start_cmd, Some("scope=services.mutate"));
+        assert!(allowed.is_ok());
+
+        // Allowed with specific service scoped token
+        let allowed_specific = CapabilityAuthorizer::authorize(&ai_peer, &start_cmd, Some("scope=service:dbus"));
+        assert!(allowed_specific.is_ok());
+
+        // Denied with unrelated scoped token
+        let denied_other = CapabilityAuthorizer::authorize(&ai_peer, &start_cmd, Some("scope=service:udev"));
+        assert!(denied_other.is_err());
     }
 }

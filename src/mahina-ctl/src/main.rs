@@ -15,10 +15,17 @@ fn print_help() {
          -t, --token <TOKEN>     Capability authorization token for elevated tasks\n  \
          -h, --help              Print help information\n  \
          -v, --version           Print version information\n\n\
-         COMMANDS:\n  \
+         SYSTEM COMMANDS:\n  \
          system state            Query holistic system telemetry and state\n  \
          system reboot           Initiate authorized system reboot\n  \
-         system shutdown         Initiate authorized system shutdown\n",
+         system shutdown         Initiate authorized system shutdown\n\n\
+         SERVICE COMMANDS:\n  \
+         service list            List all supervised services and runtime states\n  \
+         service status [NAME]   Show detailed status of a service or all services\n  \
+         service start <NAME>    Start a service\n  \
+         service stop <NAME>     Stop a service\n  \
+         service restart <NAME>  Restart a service\n  \
+         service reload <NAME>   Reload a service configuration (SIGHUP)\n",
         DEFAULT_SOCKET_PATH
     );
 }
@@ -106,7 +113,11 @@ fn main() {
         }
     };
 
-    match (positional.first().map(|s| s.as_str()), positional.get(1).map(|s| s.as_str())) {
+    let cmd = positional.first().map(|s| s.as_str());
+    let sub = positional.get(1).map(|s| s.as_str());
+    let target = positional.get(2).map(|s| s.as_str());
+
+    match (cmd, sub) {
         (Some("system"), Some("state")) => {
             match client.system_get_state() {
                 Ok(state) => {
@@ -159,6 +170,114 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("Error: system shutdown rejected: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("list")) => {
+            match client.services_list() {
+                Ok(services) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&services).unwrap_or_default());
+                    } else if services.is_empty() {
+                        println!("No services currently registered in supervisor.");
+                    } else {
+                        println!("{:<24} {:<16} {:<8}", "SERVICE", "STATE", "PID");
+                        println!("{:-<24} {:-<16} {:-<8}", "", "", "");
+                        for s in services {
+                            let pid_str = if s.pid > 0 { s.pid.to_string() } else { "-".to_string() };
+                            println!("{:<24} {:<16} {:<8}", s.name, s.state, pid_str);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to list services: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("status")) => {
+            match client.services_status(target) {
+                Ok(status) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&status).unwrap_or_default());
+                    } else {
+                        println!("==================================================");
+                        println!("          Mahina Service Status: {}", status.name);
+                        println!("==================================================");
+                        println!("  State:          {}", status.state);
+                        let pid_str = if status.pid > 0 { status.pid.to_string() } else { "-".to_string() };
+                        println!("  PID:            {}", pid_str);
+                        println!("  Restarts:       {}", status.restart_count);
+                        println!("==================================================");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to query service status: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("start")) => {
+            let name = match target {
+                Some(n) => n,
+                None => {
+                    eprintln!("Error: service start requires a service name");
+                    process::exit(1);
+                }
+            };
+            match client.services_start(name, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: service start failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("stop")) => {
+            let name = match target {
+                Some(n) => n,
+                None => {
+                    eprintln!("Error: service stop requires a service name");
+                    process::exit(1);
+                }
+            };
+            match client.services_stop(name, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: service stop failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("restart")) => {
+            let name = match target {
+                Some(n) => n,
+                None => {
+                    eprintln!("Error: service restart requires a service name");
+                    process::exit(1);
+                }
+            };
+            match client.services_restart(name, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: service restart failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("service") | Some("services"), Some("reload")) => {
+            let name = match target {
+                Some(n) => n,
+                None => {
+                    eprintln!("Error: service reload requires a service name");
+                    process::exit(1);
+                }
+            };
+            match client.services_reload(name, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: service reload failed: {}", e);
                     process::exit(1);
                 }
             }

@@ -1,6 +1,6 @@
 use crate::daemon::DEFAULT_SOCKET_PATH;
 use crate::error::ControlError;
-use crate::protocol::{Request, Response, SystemState};
+use crate::protocol::{Request, Response, ServiceEntry, ServiceStatus, SystemState};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -80,5 +80,65 @@ impl ControlClient {
     pub fn system_shutdown(&mut self, token: Option<String>) -> Result<(), ControlError> {
         let _ = self.call("system.shutdown", serde_json::json!({}), None, token)?;
         Ok(())
+    }
+
+    pub fn services_list(&mut self) -> Result<Vec<ServiceEntry>, ControlError> {
+        let val = self.call("services.list", serde_json::json!({}), None, None)?;
+        let list: Vec<ServiceEntry> = serde_json::from_value(val)?;
+        Ok(list)
+    }
+
+    pub fn services_status(&mut self, name: Option<&str>) -> Result<ServiceStatus, ControlError> {
+        let params = match name {
+            Some(n) => serde_json::json!({ "name": n }),
+            None => serde_json::json!({}),
+        };
+        let val = self.call("services.status", params, None, None)?;
+        let status: ServiceStatus = serde_json::from_value(val)?;
+        Ok(status)
+    }
+
+    pub fn services_start(&mut self, name: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "services.start",
+            serde_json::json!({ "name": name }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Started").to_string();
+        Ok(msg)
+    }
+
+    pub fn services_stop(&mut self, name: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "services.stop",
+            serde_json::json!({ "name": name }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Stopped").to_string();
+        Ok(msg)
+    }
+
+    pub fn services_restart(&mut self, name: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "services.restart",
+            serde_json::json!({ "name": name }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Restarted").to_string();
+        Ok(msg)
+    }
+
+    pub fn services_reload(&mut self, name: &str, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "services.reload",
+            serde_json::json!({ "name": name }),
+            None,
+            token,
+        )?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Reloaded").to_string();
+        Ok(msg)
     }
 }

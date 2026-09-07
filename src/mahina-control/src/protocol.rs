@@ -54,20 +54,96 @@ impl Response {
     }
 }
 
+/// Strongly typed service entry from supervisor
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServiceEntry {
+    pub name: String,
+    pub state: String,
+    pub pid: i32,
+}
+
+/// Strongly typed individual service status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ServiceStatus {
+    pub name: String,
+    pub state: String,
+    pub pid: i32,
+    pub restart_count: u32,
+}
+
 /// Strongly typed internal domain commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainCommand {
     SystemGetState,
     SystemReboot,
     SystemShutdown,
+    ServicesList,
+    ServicesStatus { name: Option<String> },
+    ServicesStart { name: String },
+    ServicesStop { name: String },
+    ServicesRestart { name: String },
+    ServicesReload { name: String },
 }
 
 impl DomainCommand {
-    pub fn parse(method: &str, _params: &serde_json::Value) -> Result<Self, ControlError> {
+    pub fn parse(method: &str, params: &serde_json::Value) -> Result<Self, ControlError> {
         match method {
             "system.get_state" => Ok(Self::SystemGetState),
             "system.reboot" => Ok(Self::SystemReboot),
             "system.shutdown" => Ok(Self::SystemShutdown),
+            "services.list" => Ok(Self::ServicesList),
+            "services.status" => {
+                let name = params.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+                Ok(Self::ServicesStatus { name })
+            }
+            "services.start" => {
+                let name = params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "name".to_string(),
+                        reason: "Missing required parameter 'name'".to_string(),
+                    })?;
+                Ok(Self::ServicesStart {
+                    name: name.to_string(),
+                })
+            }
+            "services.stop" => {
+                let name = params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "name".to_string(),
+                        reason: "Missing required parameter 'name'".to_string(),
+                    })?;
+                Ok(Self::ServicesStop {
+                    name: name.to_string(),
+                })
+            }
+            "services.restart" => {
+                let name = params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "name".to_string(),
+                        reason: "Missing required parameter 'name'".to_string(),
+                    })?;
+                Ok(Self::ServicesRestart {
+                    name: name.to_string(),
+                })
+            }
+            "services.reload" => {
+                let name = params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "name".to_string(),
+                        reason: "Missing required parameter 'name'".to_string(),
+                    })?;
+                Ok(Self::ServicesReload {
+                    name: name.to_string(),
+                })
+            }
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -77,13 +153,24 @@ impl DomainCommand {
             Self::SystemGetState => "system.get_state",
             Self::SystemReboot => "system.reboot",
             Self::SystemShutdown => "system.shutdown",
+            Self::ServicesList => "services.list",
+            Self::ServicesStatus { .. } => "services.status",
+            Self::ServicesStart { .. } => "services.start",
+            Self::ServicesStop { .. } => "services.stop",
+            Self::ServicesRestart { .. } => "services.restart",
+            Self::ServicesReload { .. } => "services.reload",
         }
     }
 
     pub fn is_mutating(&self) -> bool {
         match self {
-            Self::SystemGetState => false,
-            Self::SystemReboot | Self::SystemShutdown => true,
+            Self::SystemGetState | Self::ServicesList | Self::ServicesStatus { .. } => false,
+            Self::SystemReboot
+            | Self::SystemShutdown
+            | Self::ServicesStart { .. }
+            | Self::ServicesStop { .. }
+            | Self::ServicesRestart { .. }
+            | Self::ServicesReload { .. } => true,
         }
     }
 }
@@ -104,6 +191,8 @@ pub struct SystemState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainResult {
     SystemState(SystemState),
+    ServicesList(Vec<ServiceEntry>),
+    ServiceStatus(ServiceStatus),
     SuccessMessage(String),
     Empty,
 }
@@ -112,6 +201,8 @@ impl DomainResult {
     pub fn to_value(&self) -> serde_json::Value {
         match self {
             Self::SystemState(state) => serde_json::to_value(state).unwrap_or(serde_json::Value::Null),
+            Self::ServicesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
+            Self::ServiceStatus(status) => serde_json::to_value(status).unwrap_or(serde_json::Value::Null),
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }
@@ -145,6 +236,15 @@ mod tests {
         let cmd = DomainCommand::parse("system.get_state", &serde_json::Value::Null).unwrap();
         assert_eq!(cmd, DomainCommand::SystemGetState);
         assert!(!cmd.is_mutating());
+
+        let svc_cmd = DomainCommand::parse("services.start", &serde_json::json!({"name": "udev"})).unwrap();
+        assert_eq!(
+            svc_cmd,
+            DomainCommand::ServicesStart {
+                name: "udev".to_string()
+            }
+        );
+        assert!(svc_cmd.is_mutating());
 
         let err = DomainCommand::parse("invalid.method", &serde_json::Value::Null).unwrap_err();
         match err {
