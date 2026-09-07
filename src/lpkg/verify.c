@@ -40,8 +40,8 @@ bool verify_signature(const char *lpkg_path, const char *sig_path) {
     FILE *pf = fopen(PUBKEY_PATH, "r");
     if (!pf) {
         fprintf(stderr,
-                "lpkg: no public key at %s — refusing to install unsigned package. Run 'lpkg trust <keyfile>' to install a trusted key.\n",
-                PUBKEY_PATH);
+                "lpkg: no public key at %s — refusing to install unsigned package. Copy your trusted public key to %s (e.g. 'cp <keyfile> %s') to enable package installation.\n",
+                PUBKEY_PATH, PUBKEY_PATH, PUBKEY_PATH);
         return false; /* Fail-closed: unsigned packages are refused by default (Audit_08092026 §Phase 6) */
     }
     unsigned char pubkey[crypto_sign_PUBLICKEYBYTES];
