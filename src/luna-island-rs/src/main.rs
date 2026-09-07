@@ -340,6 +340,9 @@ fn main() -> std::io::Result<()> {
 
     let mut app = IslandApp::new();
 
+    let mut cursor_x: i32 = 0;
+    let mut cursor_y: i32 = 0;
+
     loop {
         app.update_socket();
 
@@ -378,10 +381,16 @@ fn main() -> std::io::Result<()> {
                             }
                         }
                     }
+                    t if t == LgpMessageType::PointerMotion as u16 => {
+                        if let Some(ev) = parse_pointer_motion(&msg.payload) {
+                            cursor_x = ev.x as i32;
+                            cursor_y = ev.y as i32;
+                        }
+                    }
                     t if t == LgpMessageType::PointerButton as u16 => {
                         if let Some(ev) = parse_pointer_button(&msg.payload) {
                             if ev.pressed {
-                                app.handle_click(ev.x, ev.y);
+                                app.handle_click(cursor_x, cursor_y);
                             }
                         }
                     }

@@ -187,8 +187,6 @@ fn mmap_buffer(fd: RawFd, size: usize) -> std::io::Result<*mut u8> {
 }
 
 fn send_with_fd(stream: &mut impl std::os::unix::io::AsRawFd, data: &[u8], fd: RawFd) -> std::io::Result<()> {
-    use std::os::unix::io::AsRawFd;
-
     let iov = libc::iovec {
         iov_base: data.as_ptr() as *mut libc::c_void,
         iov_len: data.len(),
