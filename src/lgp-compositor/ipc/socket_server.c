@@ -8,13 +8,35 @@
 #include "socket_server.h"
 #include "../logging/log.h"
 #include <errno.h>
-#include <grp.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+/* Direct /etc/group lookup to avoid libc NSS dlopen dependency in static binaries */
+static gid_t lookup_video_gid(void) {
+    FILE *f = fopen("/etc/group", "r");
+    if (!f) return (gid_t)-1;
+    char line[256];
+    gid_t gid = (gid_t)-1;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "video:", 6) == 0) {
+            /* Format: video:password:gid:... */
+            char *colon2 = strchr(line + 6, ':');
+            if (colon2) {
+                long val = strtol(colon2 + 1, NULL, 10);
+                gid = (gid_t)val;
+                break;
+            }
+        }
+    }
+    fclose(f);
+    return gid;
+}
 
 int lgp_socket_server_init(void) {
     /* Ensure the directory exists */
@@ -51,13 +73,13 @@ int lgp_socket_server_init(void) {
         return -1;
     }
 
-    /* Set permissions and ownership */
-    struct group *gr = getgrnam("video");
-    if (gr) {
+    /* Set permissions and ownership (parse /etc/group directly to avoid NSS dependency) */
+    gid_t video_gid = lookup_video_gid();
+    if (video_gid != (gid_t)-1) {
         chmod(LGP_SOCKET_PATH, 0660);
-        chown(LGP_SOCKET_PATH, 0, gr->gr_gid);
+        chown(LGP_SOCKET_PATH, 0, video_gid);
     } else {
-        LGP_WARN("ipc", "Group 'video' not found (NSS fallback) — relaxing socket permissions to 0666");
+        LGP_WARN("ipc", "Group 'video' not found in /etc/group — relaxing socket permissions to 0666");
         chmod(LGP_SOCKET_PATH, 0666);
     }
 
