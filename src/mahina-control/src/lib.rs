@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod auth;
+pub mod boot;
 pub mod btrfs;
 pub mod client;
 pub mod daemon;
@@ -12,6 +13,7 @@ pub mod state;
 
 pub use audit::AuditLogger;
 pub use auth::{CapabilityAuthorizer, IdentityTier, PeerCredentials};
+pub use boot::{LimineConfigGenerator, RecoveryCapabilities};
 pub use btrfs::BtrfsEngine;
 pub use client::ControlClient;
 pub use daemon::{ControlDaemon, DEFAULT_SOCKET_PATH};
