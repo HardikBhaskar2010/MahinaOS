@@ -26,6 +26,11 @@ Specifically, you must read and understand:
    - Run `make lint` to run `clang-tidy` across the codebase.
    - Run `make test-unit` to ensure there are no memory leaks (ASan and UBSan are enabled by default in test builds).
 
+### ⚠️ Static Linking & NSS Constraints
+`luna-init` is strictly statically linked (`-static`) to run as early PID 1 in initramfs without dynamic library dependencies.
+- **Never introduce NSS-dependent calls** (`getpwnam`, `getgrnam`, `getaddrinfo`) into `luna-init`. In statically linked glibc binaries, NSS dynamically loads `libnss_*.so` via dlopen, which fails or unpredictably misbehaves depending on host `/etc/nsswitch.conf`.
+- For identity lookups, parse `/etc/passwd` and `/etc/group` directly (see `parse_uid`/`parse_gid` in `src/luna-init/supervisor.c`). Direct file parsing is safe and portable for static binaries. (Authority: Audit_08092026 §Phase 7)
+
 ## 🌳 Branching Strategy
 
 We use a simple feature-branch workflow.

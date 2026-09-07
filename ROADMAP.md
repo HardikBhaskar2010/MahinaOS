@@ -55,5 +55,7 @@ The development of Mahina OS is strictly governed by the Divine Collection of Kn
 ## 🚀 Phase 4: Public Release (v1.0)
 *Focus: Polish, security audits, and deployment.*
 - **Security Hardening**
+  - Direct `/etc/passwd` and `/etc/group` parsing implemented in `luna-init` to eliminate static binary NSS traps (Audit_08092026 §Phase 7)
+  - Replace remaining `getaddrinfo` in static `supervisor.c` HTTP probe with raw IP parsing
 - **Documentation Freeze**
 - **First Public ISO Release**

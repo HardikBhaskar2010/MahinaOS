@@ -213,28 +213,73 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
 
 /* ─── Service spawning ───────────────────────────────────────────────────── */
 
+/*
+ * ─── NSS & Static Linking Safety ──────────────────────────────────────────
+ *
+ * NOTE ON STATIC LINKING & NSS DEPENDENCIES:
+ * luna-init is statically linked by design (Volume II / 04_init_system.md).
+ * In statically linked glibc binaries, NSS functions (getpwnam, getgrnam,
+ * getaddrinfo) attempt dynamic dlopen of libnss_*.so, which fails or
+ * unpredictably misbehaves depending on host /etc/nsswitch.conf.
+ *
+ * To maintain 100% reliability in PID 1 without NSS runtime traps:
+ * parse_uid() and parse_gid() parse /etc/passwd and /etc/group directly,
+ * exactly as musl and BusyBox do for static system utilities.
+ * (Authority: Audit_08092026 §Negative, concrete / Phase 7)
+ */
+
 static uid_t parse_uid(const char *name_or_id) {
+    if (!name_or_id || name_or_id[0] == '\0') return (uid_t)-1;
     char *endptr = NULL;
     long val = strtol(name_or_id, &endptr, 10);
     if (endptr != name_or_id && *endptr == '\0') {
         return (uid_t)val;
     }
-    struct passwd *pw = getpwnam(name_or_id);
-    if (pw) {
-        return pw->pw_uid;
+    /* Direct /etc/passwd lookup to avoid NSS dependency in static luna-init */
+    FILE *f = fopen("/etc/passwd", "r");
+    if (f) {
+        char line[256];
+        size_t name_len = strlen(name_or_id);
+        while (fgets(line, sizeof(line), f)) {
+            if (strncmp(line, name_or_id, name_len) == 0 && line[name_len] == ':') {
+                /* Format: username:password:uid:gid:... */
+                char *colon2 = strchr(line + name_len + 1, ':');
+                if (colon2) {
+                    val = strtol(colon2 + 1, NULL, 10);
+                    fclose(f);
+                    return (uid_t)val;
+                }
+            }
+        }
+        fclose(f);
     }
     return (uid_t)-1;
 }
 
 static gid_t parse_gid(const char *name_or_id) {
+    if (!name_or_id || name_or_id[0] == '\0') return (gid_t)-1;
     char *endptr = NULL;
     long val = strtol(name_or_id, &endptr, 10);
     if (endptr != name_or_id && *endptr == '\0') {
         return (gid_t)val;
     }
-    struct group *gr = getgrnam(name_or_id);
-    if (gr) {
-        return gr->gr_gid;
+    /* Direct /etc/group lookup to avoid NSS dependency in static luna-init */
+    FILE *f = fopen("/etc/group", "r");
+    if (f) {
+        char line[256];
+        size_t name_len = strlen(name_or_id);
+        while (fgets(line, sizeof(line), f)) {
+            if (strncmp(line, name_or_id, name_len) == 0 && line[name_len] == ':') {
+                /* Format: groupname:password:gid:... */
+                char *colon2 = strchr(line + name_len + 1, ':');
+                if (colon2) {
+                    val = strtol(colon2 + 1, NULL, 10);
+                    fclose(f);
+                    return (gid_t)val;
+                }
+            }
+        }
+        fclose(f);
     }
     return (gid_t)-1;
 }
