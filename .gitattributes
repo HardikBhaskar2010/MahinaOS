@@ -1,0 +1,38 @@
+# MahinaOS — Line ending normalization
+# Authority: Audit_08092026 §Build/CRLF
+# All text files use LF. No exceptions.
+
+* text=auto eol=lf
+
+# Source code
+*.c text eol=lf
+*.h text eol=lf
+*.rs text eol=lf
+
+# Build system
+Makefile text eol=lf
+*.toml text eol=lf
+*.mk text eol=lf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+
+# Scripts
+*.sh text eol=lf
+
+# Configuration
+*.conf text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.editorconfig text eol=lf
+
+# Binary files — do not normalize
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.lraw binary
+*.lpkg binary

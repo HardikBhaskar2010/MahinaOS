@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -64,11 +65,6 @@ static long long now_ms(void) {
     struct timespec ts = {0};
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     return (long long)ts.tv_sec * 1000LL + (long long)ts.tv_nsec / 1000000LL;
-}
-
-static void sleep_ms(int ms) {
-    struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (long)(ms % 1000) * 1000000L };
-    nanosleep(&ts, NULL);
 }
 
 /* ─── Readiness polling ──────────────────────────────────────────────────── */
