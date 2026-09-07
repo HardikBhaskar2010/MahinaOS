@@ -1,9 +1,10 @@
 use std::process::Command;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::fs;
 use std::io;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum SystemError {
     CopyFailed(String),
     FstabFailed(String),
@@ -73,52 +74,70 @@ pub fn generate_fstab(disk_path: &str, target_dir: &str) -> Result<(), SystemErr
     let root_uuid = get_uuid(&part2).ok_or_else(|| SystemError::FstabFailed("Could not get Root UUID".to_string()))?;
 
     let fstab_content = format!(
-        "# /etc/luna/fstab.toml
-[[mount]]
-device = \"UUID={}\"
-mountpoint = \"/\"
-fstype = \"ext4\"
-options = \"rw,relatime\"
-
-[[mount]]
-device = \"UUID={}\"
-mountpoint = \"/boot\"
-fstype = \"vfat\"
-options = \"rw,relatime\"
-", root_uuid, esp_uuid
+        "# /etc/fstab: static file system information for MahinaOS
+# <file system>             <mount point>   <type>  <options>                       <dump>  <pass>
+UUID={}       /               btrfs   rw,subvol=@,relatime            0       0
+UUID={}       /home           btrfs   rw,subvol=@home,relatime        0       0
+UUID={}       /boot/efi       vfat    rw,relatime                     0       2
+", root_uuid, root_uuid, esp_uuid
     );
 
-    let fstab_dir = Path::new(target_dir).join("etc/luna");
-    fs::create_dir_all(&fstab_dir).unwrap_or(());
-    fs::write(fstab_dir.join("fstab.toml"), fstab_content)
+    let etc_dir = Path::new(target_dir).join("etc");
+    fs::create_dir_all(&etc_dir).unwrap_or(());
+    fs::write(etc_dir.join("fstab"), fstab_content)
         .map_err(|e| SystemError::FstabFailed(e.to_string()))?;
 
     Ok(())
 }
 
 pub fn install_bootloader(target_dir: &str) -> Result<(), SystemError> {
-    // For UEFI, simply copy systemd-boot or limine EFI binary to ESP
-    // Assuming ESP is mounted at /boot inside target_dir
-    let esp_efi_dir = Path::new(target_dir).join("boot/EFI/BOOT");
-    fs::create_dir_all(&esp_efi_dir).map_err(|e| SystemError::BootloaderFailed(e.to_string()))?;
+    // For UEFI, copy Limine EFI loader and config to ESP (/boot/efi/EFI/BOOT)
+    let esp_boot_dir = Path::new(target_dir).join("boot/efi/EFI/BOOT");
+    fs::create_dir_all(&esp_boot_dir).map_err(|e| SystemError::BootloaderFailed(e.to_string()))?;
 
-    // As a generic fallback, we use limine bios-install and copy limine efi if available.
-    // In a real environment, this might call `bootctl install --path=/boot` in a chroot.
-    
-    // We execute chroot bootctl if systemd-boot is present
-    let bootctl = Path::new(target_dir).join("usr/bin/bootctl");
-    if bootctl.exists() {
-        let out = Command::new("chroot")
-            .arg(target_dir)
-            .arg("/usr/bin/bootctl")
-            .arg("install")
-            .output()
-            .map_err(|e| SystemError::BootloaderFailed(e.to_string()))?;
-            
-        if !out.status.success() {
-            return Err(SystemError::BootloaderFailed(String::from_utf8_lossy(&out.stderr).to_string()));
+    // Copy BOOTX64.EFI from live media or system locations
+    let limine_candidates = [
+        "/boot/efi/EFI/BOOT/BOOTX64.EFI",
+        "/usr/share/limine/BOOTX64.EFI",
+        "/build/limine/BOOTX64.EFI",
+    ];
+
+    for src in &limine_candidates {
+        if Path::new(src).exists() {
+            let _ = fs::copy(src, esp_boot_dir.join("BOOTX64.EFI"));
+            break;
         }
     }
-    
+
+    // Copy limine.conf to ESP locations
+    let limine_conf_candidates = [
+        "/boot/efi/limine.conf",
+        "/boot/limine.conf",
+        "/etc/luna/limine.conf",
+    ];
+
+    for src in &limine_conf_candidates {
+        if Path::new(src).exists() {
+            let _ = fs::copy(src, esp_boot_dir.join("limine.conf"));
+            let _ = fs::copy(src, Path::new(target_dir).join("boot/efi/limine.conf"));
+            break;
+        }
+    }
+
+    // Copy kernel and initramfs to /boot/efi
+    let efi_dir = Path::new(target_dir).join("boot/efi");
+    for k in &["/boot/efi/vmlinuz-mahina", "/boot/vmlinuz-mahina", "/build/vmlinuz-mahina"] {
+        if Path::new(k).exists() {
+            let _ = fs::copy(k, efi_dir.join("vmlinuz-mahina"));
+            break;
+        }
+    }
+    for init in &["/boot/efi/initramfs-mahina.img", "/boot/initramfs-mahina.img", "/build/initramfs-mahina.img"] {
+        if Path::new(init).exists() {
+            let _ = fs::copy(init, efi_dir.join("initramfs-mahina.img"));
+            break;
+        }
+    }
+
     Ok(())
 }

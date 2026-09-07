@@ -4,18 +4,22 @@ use std::path::Path;
 use std::ffi::CString;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum UserError {
     FileWriteFailed(String),
     CryptFailed,
 }
 
+extern "C" {
+    fn crypt(key: *const libc::c_char, salt: *const libc::c_char) -> *mut libc::c_char;
+}
+
 fn hash_password(password: &str) -> Result<String, UserError> {
     let pass_c = CString::new(password).map_err(|_| UserError::CryptFailed)?;
-    // Use $6$ for SHA-512 crypt. Generate a fixed salt for simplicity, or in a real scenario, randomly generate one.
-    let salt_c = CString::new("$6$lunasalt$").map_err(|_| UserError::CryptFailed)?;
+    let salt_c = CString::new("$6$mahinasalt$").map_err(|_| UserError::CryptFailed)?;
     
     unsafe {
-        let hash_ptr = libc::crypt(pass_c.as_ptr(), salt_c.as_ptr());
+        let hash_ptr = crypt(pass_c.as_ptr(), salt_c.as_ptr());
         if hash_ptr.is_null() {
             return Err(UserError::CryptFailed);
         }

@@ -4,6 +4,7 @@ use std::path::Path;
 use std::fs;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum DiskError {
     PartitionFailed(String),
     FormatFailed(String),
@@ -69,9 +70,11 @@ pub fn format_partitions(disk_path: &str) -> Result<(), DiskError> {
         ));
     }
 
-    // Format Root
-    let out_root = Command::new("mkfs.ext4")
-        .arg("-F") // Force
+    // Format Root as Btrfs
+    let out_root = Command::new("mkfs.btrfs")
+        .arg("-f")
+        .arg("-L")
+        .arg("MAHINA_ROOT")
         .arg(&part2)
         .output()
         .map_err(|e| DiskError::FormatFailed(e.to_string()))?;
@@ -92,29 +95,65 @@ pub fn mount_target(disk_path: &str, target_dir: &str) -> Result<(), DiskError> 
         (format!("{}1", disk_path), format!("{}2", disk_path))
     };
 
+    // Create temporary mount point to initialize Btrfs subvolumes
+    let tmp_mnt = "/tmp/mahina_btrfs_init";
+    if !Path::new(tmp_mnt).exists() {
+        fs::create_dir_all(tmp_mnt).map_err(|e| DiskError::MountFailed(e.to_string()))?;
+    }
+
+    // Mount top-level Btrfs volume
+    mount(
+        Some(part2.as_str()),
+        tmp_mnt,
+        Some("btrfs"),
+        MsFlags::empty(),
+        None::<&str>,
+    ).map_err(|e| DiskError::MountFailed(format!("Failed to mount Btrfs top-level: {}", e)))?;
+
+    // Create subvolumes: @ (root), @home, @snapshots, @generations
+    let _ = Command::new("btrfs").args(["subvolume", "create", &format!("{}/@", tmp_mnt)]).output();
+    let _ = Command::new("btrfs").args(["subvolume", "create", &format!("{}/@home", tmp_mnt)]).output();
+    let _ = Command::new("btrfs").args(["subvolume", "create", &format!("{}/@snapshots", tmp_mnt)]).output();
+    let _ = Command::new("btrfs").args(["subvolume", "create", &format!("{}/@generations", tmp_mnt)]).output();
+
+    let _ = nix::mount::umount(tmp_mnt);
+
     // Create target dir
     if !Path::new(target_dir).exists() {
         fs::create_dir_all(target_dir).map_err(|e| DiskError::MountFailed(e.to_string()))?;
     }
 
-    // Mount root
+    // Mount @ subvolume as target root
     mount(
         Some(part2.as_str()),
         target_dir,
-        Some("ext4"),
+        Some("btrfs"),
         MsFlags::empty(),
-        None::<&str>,
-    ).map_err(|e| DiskError::MountFailed(format!("Failed to mount root: {}", e)))?;
+        Some("subvol=@"),
+    ).map_err(|e| DiskError::MountFailed(format!("Failed to mount root subvolume: {}", e)))?;
 
-    // Mount ESP
-    let boot_dir = format!("{}/boot", target_dir);
-    if !Path::new(&boot_dir).exists() {
-        fs::create_dir_all(&boot_dir).map_err(|e| DiskError::MountFailed(e.to_string()))?;
+    // Mount @home subvolume
+    let home_dir = format!("{}/home", target_dir);
+    if !Path::new(&home_dir).exists() {
+        fs::create_dir_all(&home_dir).map_err(|e| DiskError::MountFailed(e.to_string()))?;
+    }
+    mount(
+        Some(part2.as_str()),
+        home_dir.as_str(),
+        Some("btrfs"),
+        MsFlags::empty(),
+        Some("subvol=@home"),
+    ).map_err(|e| DiskError::MountFailed(format!("Failed to mount @home subvolume: {}", e)))?;
+
+    // Mount ESP at /boot/efi
+    let efi_dir = format!("{}/boot/efi", target_dir);
+    if !Path::new(&efi_dir).exists() {
+        fs::create_dir_all(&efi_dir).map_err(|e| DiskError::MountFailed(e.to_string()))?;
     }
 
     mount(
         Some(part1.as_str()),
-        boot_dir.as_str(),
+        efi_dir.as_str(),
         Some("vfat"),
         MsFlags::empty(),
         None::<&str>,

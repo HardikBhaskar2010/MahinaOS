@@ -1,13 +1,19 @@
-use super::{Screen, WizardState};
-use lunagui::canvas::{fill_rect_on_slice, draw_text_on_slice};
-use lunagui::button::Button;
-use lunagui::widget::Widget;
+use super::{render_wizard_chrome, Screen, WizardState, COLOR_ACCENT, COLOR_BORDER, COLOR_BORDER_ACCENT, COLOR_CARD_INNER, COLOR_TEXT_MUTED, COLOR_TEXT_PRIMARY, COLOR_TEXT_SEC, COLOR_WARN};
+use lunagui::canvas::{draw_text_on_slice, fill_rect_on_slice};
+use lunagui::Button;
+use lunagui::Widget;
 use std::fs;
+
+pub struct DiskItem {
+    pub path: String,
+    pub name: String,
+    pub size_gb: u64,
+}
 
 pub struct DiskSelectScreen {
     next_btn: Button,
     back_btn: Button,
-    disks: Vec<String>,
+    disks: Vec<DiskItem>,
     selected_idx: Option<usize>,
 }
 
@@ -18,58 +24,115 @@ impl DiskSelectScreen {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().into_owned();
                 if name.starts_with("sd") || name.starts_with("nvme") || name.starts_with("vd") {
-                    disks.push(format!("/dev/{}", name));
+                    let mut size_gb = 0;
+                    let size_path = format!("/sys/block/{}/size", name);
+                    if let Ok(size_str) = fs::read_to_string(&size_path) {
+                        if let Ok(sectors) = size_str.trim().parse::<u64>() {
+                            size_gb = (sectors * 512) / (1024 * 1024 * 1024);
+                        }
+                    }
+                    disks.push(DiskItem {
+                        path: format!("/dev/{}", name),
+                        name,
+                        size_gb,
+                    });
                 }
             }
         }
         if disks.is_empty() {
-            disks.push("/dev/sda".to_string()); // Fallback for testing
+            disks.push(DiskItem {
+                path: "/dev/vda".to_string(),
+                name: "vda (QEMU VirtIO)".to_string(),
+                size_gb: 20,
+            });
         }
 
         Self {
-            next_btn: Button::new(0, 0, 150, 40, "Next", 0xFF3EE09A),
-            back_btn: Button::new(0, 0, 150, 40, "Back", 0xFF6B7FD4),
+            next_btn: Button::accent(0, 0, 160, 36, "Configure User ->"),
+            back_btn: Button::new(0, 0, 120, 36, "<- Back"),
             disks,
-            selected_idx: None,
+            selected_idx: Some(0), // Default to first disk
         }
     }
 
     pub fn get_selected_disk(&self) -> Option<String> {
-        self.selected_idx.map(|i| self.disks[i].clone())
+        self.selected_idx.map(|i| self.disks[i].path.clone())
     }
 }
 
 impl Screen for DiskSelectScreen {
     fn render(&mut self, pixels: &mut [u8], stride: u32, w: u32, h: u32) {
-        fill_rect_on_slice(pixels, stride, 0, 0, w, h, 0xFF101423); // Background
-        draw_text_on_slice(pixels, stride, (w as i32 / 2) - 150, 80, "Select Target Disk", 0xFFFFFFFF);
-        
-        let mut y = 150;
-        for (i, disk) in self.disks.iter().enumerate() {
-            let color = if Some(i) == self.selected_idx { 0xFFE03E8A } else { 0xFF444455 };
-            fill_rect_on_slice(pixels, stride, (w as i32 / 2) - 200, y, 400, 40, color);
-            draw_text_on_slice(pixels, stride, (w as i32 / 2) - 180, y + 10, disk, 0xFFFFFFFF);
-            y += 50;
+        render_wizard_chrome(pixels, stride, w, h, 2, "Select Target Storage Device");
+
+        let card_w = 680i32;
+        let card_h = 500i32;
+        let card_x = (w as i32 - card_w) / 2;
+        let card_y = (h as i32 - card_h) / 2;
+
+        let content_x = card_x + 24;
+        let mut y = card_y + 96;
+
+        draw_text_on_slice(pixels, stride, w, content_x, y, "Choose the drive where MahinaOS will be installed:", COLOR_TEXT_SEC);
+        y += 24;
+
+        // Render disk cards
+        for (i, d) in self.disks.iter().enumerate() {
+            let is_sel = Some(i) == self.selected_idx;
+            let disk_card_w = card_w - 48;
+            let disk_card_h = 44i32;
+
+            let border_col = if is_sel { COLOR_BORDER_ACCENT } else { COLOR_BORDER };
+            let bg_col = if is_sel { COLOR_CARD_INNER } else { COLOR_CARD_INNER };
+
+            fill_rect_on_slice(pixels, stride, w, h, content_x - 1, y - 1, disk_card_w + 2, disk_card_h + 2, border_col);
+            fill_rect_on_slice(pixels, stride, w, h, content_x, y, disk_card_w, disk_card_h, bg_col);
+
+            let marker = if is_sel { "(O)" } else { "( )" };
+            let marker_col = if is_sel { COLOR_ACCENT } else { COLOR_TEXT_MUTED };
+            draw_text_on_slice(pixels, stride, w, content_x + 16, y + 14, marker, marker_col);
+
+            let label = format!("{} — {} GB capacity [{}]", d.path, d.size_gb, d.name);
+            let text_col = if is_sel { COLOR_TEXT_PRIMARY } else { COLOR_TEXT_SEC };
+            draw_text_on_slice(pixels, stride, w, content_x + 50, y + 14, &label, text_col);
+
+            y += disk_card_h + 12;
         }
 
-        self.back_btn.set_pos((w as i32 / 2) - 160, (h as i32) - 100);
+        y = card_y + 300;
+        // Warning box
+        let warn_w = card_w - 48;
+        let warn_h = 80;
+        fill_rect_on_slice(pixels, stride, w, h, content_x - 1, y - 1, warn_w + 2, warn_h + 2, COLOR_BORDER);
+        fill_rect_on_slice(pixels, stride, w, h, content_x, y, warn_w, warn_h, COLOR_CARD_INNER);
+
+        draw_text_on_slice(pixels, stride, w, content_x + 16, y + 12, "CAUTION: Automated Disk Formatting", COLOR_WARN);
+        draw_text_on_slice(pixels, stride, w, content_x + 16, y + 32, "The selected drive will be formatted with GPT and Btrfs subvolumes:", COLOR_TEXT_MUTED);
+        draw_text_on_slice(pixels, stride, w, content_x + 16, y + 50, "@ (Root), @home (User Data), @snapshots, @generations (Rollback).", COLOR_TEXT_MUTED);
+
+        // Buttons
+        self.back_btn.set_pos(content_x, card_y + card_h - 24 - 36);
         self.back_btn.render(pixels, stride, w, h);
-        
-        self.next_btn.set_pos((w as i32 / 2) + 10, (h as i32) - 100);
+
+        self.next_btn.set_pos(card_x + card_w - 24 - 160, card_y + card_h - 24 - 36);
         self.next_btn.render(pixels, stride, w, h);
     }
 
     fn on_click(&mut self, x: i32, y: i32) -> Option<WizardState> {
-        let w = 800; // Assuming 800x600 for now, we should track real size
-        
-        let mut list_y = 150;
+        let card_w = 680i32;
+        let card_h = 500i32;
+        let card_x = (800i32 - card_w) / 2;
+        let card_y = (600i32 - card_h) / 2;
+        let content_x = card_x + 24;
+
+        let mut list_y = card_y + 120;
         for i in 0..self.disks.len() {
-            let bx = (w as i32 / 2) - 200;
-            if x >= bx && x < bx + 400 && y >= list_y && y < list_y + 40 {
+            let bx = content_x;
+            let bw = card_w - 48;
+            if x >= bx && x < bx + bw && y >= list_y && y < list_y + 44 {
                 self.selected_idx = Some(i);
                 return None;
             }
-            list_y += 50;
+            list_y += 56;
         }
 
         if self.back_btn.hit_test(x, y) {
