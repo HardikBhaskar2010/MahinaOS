@@ -119,7 +119,9 @@ int frames_init(const char *dir) {
 
     /* If meta.txt didn't give us dimensions, probe the first frame */
     if (s_native_w == 0 || s_native_h == 0) {
-        int w, h, ch;
+        int w = 0;
+        int h = 0;
+        int ch = 0;
         unsigned char *tmp = stbi_load(s_frame_paths[0], &w, &h, &ch, 3);
         if (tmp) {
             s_native_w = w;
@@ -151,7 +153,9 @@ bool frames_load_next(uint32_t *fb_mem,
     /* ── 1. Decode PNG ───────────────────────────────────────────────────── */
     const char *path = s_frame_paths[s_frame_index];
 
-    int img_w, img_h, channels;
+    int img_w = 0;
+    int img_h = 0;
+    int channels = 0;
     /* Request 3 channels (RGB) — we manually build the XRGB8888 uint32_t so
      * there is no colour-space alteration at all.  stb_image returns bytes in
      * R, G, B order for a 3-channel load of a standard PNG. */
