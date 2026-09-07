@@ -25,7 +25,9 @@ fn print_help() {
          service start <NAME>    Start a service\n  \
          service stop <NAME>     Stop a service\n  \
          service restart <NAME>  Restart a service\n  \
-         service reload <NAME>   Reload a service configuration (SIGHUP)\n",
+         service reload <NAME>   Reload a service configuration (SIGHUP)\n\n\
+         USER COMMANDS:\n  \
+         user list               List local user accounts and group memberships\n",
         DEFAULT_SOCKET_PATH
     );
 }
@@ -278,6 +280,28 @@ fn main() {
                 Ok(msg) => println!("{}", msg),
                 Err(e) => {
                     eprintln!("Error: service reload failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("user") | Some("users"), Some("list")) => {
+            match client.users_list() {
+                Ok(users) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&users).unwrap_or_default());
+                    } else if users.is_empty() {
+                        println!("No local user accounts found.");
+                    } else {
+                        println!("{:<16} {:<6} {:<6} {:<24} {:<16} {:<20}", "USER", "UID", "GID", "HOME", "SHELL", "GROUPS");
+                        println!("{:-<16} {:-<6} {:-<6} {:-<24} {:-<16} {:-<20}", "", "", "", "", "", "");
+                        for u in users {
+                            let grps = u.groups.join(", ");
+                            println!("{:<16} {:<6} {:<6} {:<24} {:<16} {:<20}", u.username, u.uid, u.gid, u.home_dir, u.shell, grps);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to list users: {}", e);
                     process::exit(1);
                 }
             }

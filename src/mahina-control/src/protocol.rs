@@ -71,6 +71,18 @@ pub struct ServiceStatus {
     pub restart_count: u32,
 }
 
+/// Strongly typed user entry (passwords strictly excluded)
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserEntry {
+    pub username: String,
+    pub uid: u32,
+    pub gid: u32,
+    pub comment: String,
+    pub home_dir: String,
+    pub shell: String,
+    pub groups: Vec<String>,
+}
+
 /// Strongly typed internal domain commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainCommand {
@@ -83,6 +95,7 @@ pub enum DomainCommand {
     ServicesStop { name: String },
     ServicesRestart { name: String },
     ServicesReload { name: String },
+    UsersList,
 }
 
 impl DomainCommand {
@@ -144,6 +157,7 @@ impl DomainCommand {
                     name: name.to_string(),
                 })
             }
+            "users.list" => Ok(Self::UsersList),
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -159,12 +173,13 @@ impl DomainCommand {
             Self::ServicesStop { .. } => "services.stop",
             Self::ServicesRestart { .. } => "services.restart",
             Self::ServicesReload { .. } => "services.reload",
+            Self::UsersList => "users.list",
         }
     }
 
     pub fn is_mutating(&self) -> bool {
         match self {
-            Self::SystemGetState | Self::ServicesList | Self::ServicesStatus { .. } => false,
+            Self::SystemGetState | Self::ServicesList | Self::ServicesStatus { .. } | Self::UsersList => false,
             Self::SystemReboot
             | Self::SystemShutdown
             | Self::ServicesStart { .. }
@@ -193,6 +208,7 @@ pub enum DomainResult {
     SystemState(SystemState),
     ServicesList(Vec<ServiceEntry>),
     ServiceStatus(ServiceStatus),
+    UsersList(Vec<UserEntry>),
     SuccessMessage(String),
     Empty,
 }
@@ -203,6 +219,7 @@ impl DomainResult {
             Self::SystemState(state) => serde_json::to_value(state).unwrap_or(serde_json::Value::Null),
             Self::ServicesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::ServiceStatus(status) => serde_json::to_value(status).unwrap_or(serde_json::Value::Null),
+            Self::UsersList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }

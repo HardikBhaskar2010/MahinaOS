@@ -1,14 +1,17 @@
 pub mod service;
 pub mod system;
+pub mod user;
 
 use crate::error::ControlError;
 use crate::protocol::{DomainCommand, DomainResult};
 use self::service::ServiceProvider;
 use self::system::SystemProvider;
+use self::user::UserProvider;
 
 pub struct ProviderDispatcher {
     pub system: SystemProvider,
     pub service: ServiceProvider,
+    pub user: UserProvider,
 }
 
 impl ProviderDispatcher {
@@ -16,11 +19,12 @@ impl ProviderDispatcher {
         Self {
             system: SystemProvider::new(),
             service: ServiceProvider::new(),
+            user: UserProvider::new(),
         }
     }
 
-    pub fn with_providers(system: SystemProvider, service: ServiceProvider) -> Self {
-        Self { system, service }
+    pub fn with_providers(system: SystemProvider, service: ServiceProvider, user: UserProvider) -> Self {
+        Self { system, service, user }
     }
 
     pub fn dispatch(&self, command: DomainCommand) -> Result<DomainResult, ControlError> {
@@ -60,6 +64,10 @@ impl ProviderDispatcher {
             DomainCommand::ServicesReload { name } => {
                 self.service.reload(&name)?;
                 Ok(DomainResult::SuccessMessage(format!("Service '{}' reloaded successfully", name)))
+            }
+            DomainCommand::UsersList => {
+                let users = self.user.list()?;
+                Ok(DomainResult::UsersList(users))
             }
         }
     }

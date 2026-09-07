@@ -1,6 +1,6 @@
 use crate::daemon::DEFAULT_SOCKET_PATH;
 use crate::error::ControlError;
-use crate::protocol::{Request, Response, ServiceEntry, ServiceStatus, SystemState};
+use crate::protocol::{Request, Response, ServiceEntry, ServiceStatus, SystemState, UserEntry};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -140,5 +140,11 @@ impl ControlClient {
         )?;
         let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Reloaded").to_string();
         Ok(msg)
+    }
+
+    pub fn users_list(&mut self) -> Result<Vec<UserEntry>, ControlError> {
+        let val = self.call("users.list", serde_json::json!({}), None, None)?;
+        let list: Vec<UserEntry> = serde_json::from_value(val)?;
+        Ok(list)
     }
 }

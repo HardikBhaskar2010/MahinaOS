@@ -100,10 +100,11 @@ impl CapabilityAuthorizer {
         let tier = IdentityTier::from_uid(peer.uid);
 
         match command {
-            // Read-only system state & service queries: accessible to any caller with socket transport access
-            DomainCommand::SystemGetState | DomainCommand::ServicesList | DomainCommand::ServicesStatus { .. } => {
-                Ok(tier)
-            }
+            // Read-only system state, service, & user queries: accessible to any caller with socket transport access
+            DomainCommand::SystemGetState
+            | DomainCommand::ServicesList
+            | DomainCommand::ServicesStatus { .. }
+            | DomainCommand::UsersList => Ok(tier),
 
             // Privileged mutating operations: requires root/admin or valid capability token
             DomainCommand::SystemReboot | DomainCommand::SystemShutdown => {
