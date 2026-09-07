@@ -19,10 +19,10 @@
 #include <unistd.h>
 
 /* Basic modifier masks for LGP clients. */
-#define LGP_MOD_SHIFT 0x01u
-#define LGP_MOD_CTRL  0x02u
-#define LGP_MOD_ALT   0x04u
-#define LGP_MOD_SUPER 0x08u
+#define LGP_MOD_SHIFT 0x01U
+#define LGP_MOD_CTRL  0x02U
+#define LGP_MOD_ALT   0x04U
+#define LGP_MOD_SUPER 0x08U
 
 typedef struct {
     int      screen_w;
@@ -341,10 +341,10 @@ static void lgp_input_pump_raw_mouse(lgp_compositor_state_t *state) {
         int dx = (int)data[1];
         int dy = (int)data[2];
 
-        if ((data[0] & 0x10u) != 0u) {
+        if ((data[0] & 0x10U) != 0U) {
             dx -= 256;
         }
-        if ((data[0] & 0x20u) != 0u) {
+        if ((data[0] & 0x20U) != 0U) {
             dy -= 256;
         }
 
@@ -360,15 +360,15 @@ static void lgp_input_pump_raw_mouse(lgp_compositor_state_t *state) {
         static bool last_left = false;
         static bool last_right = false;
 
-        bool left_button = (data[0] & 0x01u) != 0u;
-        bool right_button = (data[0] & 0x02u) != 0u;
+        bool left_button = (data[0] & 0x01U) != 0U;
+        bool right_button = (data[0] & 0x02U) != 0U;
 
         if (left_button != last_left) {
-            lgp_dispatch_pointer_button(state, x, y, 0u, left_button);
+            lgp_dispatch_pointer_button(state, x, y, 0U, left_button);
             last_left = left_button;
         }
         if (right_button != last_right) {
-            lgp_dispatch_pointer_button(state, x, y, 1u, right_button);
+            lgp_dispatch_pointer_button(state, x, y, 1U, right_button);
             last_right = right_button;
         }
     }

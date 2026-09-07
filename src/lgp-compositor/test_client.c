@@ -20,21 +20,21 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#define TEST_SURFACE_WIDTH 360u
-#define TEST_SURFACE_HEIGHT 220u
-#define TEST_SURFACE_STRIDE (TEST_SURFACE_WIDTH * 4u)
+#define TEST_SURFACE_WIDTH 360U
+#define TEST_SURFACE_HEIGHT 220U
+#define TEST_SURFACE_STRIDE (TEST_SURFACE_WIDTH * 4U)
 #define TEST_SURFACE_SIZE (TEST_SURFACE_STRIDE * TEST_SURFACE_HEIGHT)
 
 static void write_u16_le(uint8_t *p, uint16_t value) {
-    p[0] = (uint8_t)(value & 0xFFu);
-    p[1] = (uint8_t)((value >> 8) & 0xFFu);
+    p[0] = (uint8_t)(value & 0xFFU);
+    p[1] = (uint8_t)((value >> 8) & 0xFFU);
 }
 
 static void write_u32_le(uint8_t *p, uint32_t value) {
-    p[0] = (uint8_t)(value & 0xFFu);
-    p[1] = (uint8_t)((value >> 8) & 0xFFu);
-    p[2] = (uint8_t)((value >> 16) & 0xFFu);
-    p[3] = (uint8_t)((value >> 24) & 0xFFu);
+    p[0] = (uint8_t)(value & 0xFFU);
+    p[1] = (uint8_t)((value >> 8) & 0xFFU);
+    p[2] = (uint8_t)((value >> 16) & 0xFFU);
+    p[3] = (uint8_t)((value >> 24) & 0xFFU);
 }
 
 static void write_i32_le(uint8_t *p, int32_t value) {
@@ -118,14 +118,14 @@ static void encode_header(uint8_t *buf, uint16_t type, uint32_t length) {
 static void render_pattern(uint32_t *pixels) {
     for (uint32_t y = 0; y < TEST_SURFACE_HEIGHT; y++) {
         for (uint32_t x = 0; x < TEST_SURFACE_WIDTH; x++) {
-            uint8_t r = (uint8_t)((x * 255u) / TEST_SURFACE_WIDTH);
-            uint8_t g = (uint8_t)((y * 255u) / TEST_SURFACE_HEIGHT);
-            uint8_t b = 0x80u;
+            uint8_t r = (uint8_t)((x * 255U) / TEST_SURFACE_WIDTH);
+            uint8_t g = (uint8_t)((y * 255U) / TEST_SURFACE_HEIGHT);
+            uint8_t b = 0x80U;
 
             if (x < 8 || y < 8 || x >= TEST_SURFACE_WIDTH - 8 || y >= TEST_SURFACE_HEIGHT - 8) {
-                r = 0x48u;
-                g = 0xD1u;
-                b = 0xCCu;
+                r = 0x48U;
+                g = 0xD1U;
+                b = 0xCCU;
             }
 
             pixels[(size_t)y * TEST_SURFACE_WIDTH + x] =

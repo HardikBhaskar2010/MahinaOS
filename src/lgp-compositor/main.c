@@ -39,10 +39,10 @@
 static bool lgp_write_all(int fd, const uint8_t *buf, size_t len);
 
 static void write_u32_le(uint8_t *p, uint32_t v) {
-    p[0] = (uint8_t)(v & 0xFFu);
-    p[1] = (uint8_t)((v >> 8) & 0xFFu);
-    p[2] = (uint8_t)((v >> 16) & 0xFFu);
-    p[3] = (uint8_t)((v >> 24) & 0xFFu);
+    p[0] = (uint8_t)(v & 0xFFU);
+    p[1] = (uint8_t)((v >> 8) & 0xFFU);
+    p[2] = (uint8_t)((v >> 16) & 0xFFU);
+    p[3] = (uint8_t)((v >> 24) & 0xFFU);
 }
 
 static void lgp_send_pointer_motion_to_session(lgp_compositor_state_t *state,
