@@ -1,3 +1,4 @@
+pub mod generation;
 pub mod package;
 pub mod service;
 pub mod storage;
@@ -6,6 +7,7 @@ pub mod user;
 
 use crate::error::ControlError;
 use crate::protocol::{DomainCommand, DomainResult};
+use self::generation::GenerationProvider;
 use self::package::PackageProvider;
 use self::service::ServiceProvider;
 use self::storage::StorageProvider;
@@ -18,6 +20,7 @@ pub struct ProviderDispatcher {
     pub user: UserProvider,
     pub package: PackageProvider,
     pub storage: StorageProvider,
+    pub generation: GenerationProvider,
 }
 
 impl ProviderDispatcher {
@@ -28,6 +31,7 @@ impl ProviderDispatcher {
             user: UserProvider::new(),
             package: PackageProvider::new(),
             storage: StorageProvider::new(),
+            generation: GenerationProvider::new(),
         }
     }
 
@@ -37,6 +41,7 @@ impl ProviderDispatcher {
         user: UserProvider,
         package: PackageProvider,
         storage: StorageProvider,
+        generation: GenerationProvider,
     ) -> Self {
         Self {
             system,
@@ -44,6 +49,7 @@ impl ProviderDispatcher {
             user,
             package,
             storage,
+            generation,
         }
     }
 
@@ -113,6 +119,14 @@ impl ProviderDispatcher {
             } => {
                 let msg = self.storage.mount(&source, &target, fs_type.as_deref(), options.as_deref())?;
                 Ok(DomainResult::SuccessMessage(msg))
+            }
+            DomainCommand::GenerationsGetCurrent => {
+                let current = self.generation.get_current()?;
+                Ok(DomainResult::GenerationCurrent(current))
+            }
+            DomainCommand::GenerationsList => {
+                let list = self.generation.list()?;
+                Ok(DomainResult::GenerationsList(list))
             }
         }
     }

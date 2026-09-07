@@ -1,8 +1,8 @@
 use crate::daemon::DEFAULT_SOCKET_PATH;
 use crate::error::ControlError;
 use crate::protocol::{
-    PackageEntry, Request, Response, ServiceEntry, ServiceStatus, StorageOverview, SystemState,
-    UserEntry,
+    GenerationEntry, PackageEntry, Request, Response, ServiceEntry, ServiceStatus, StorageOverview,
+    SystemState, UserEntry,
 };
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -207,5 +207,17 @@ impl ControlClient {
         let val = self.call("storage.mount", params, None, token)?;
         let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Mounted").to_string();
         Ok(msg)
+    }
+
+    pub fn generation_get_current(&mut self) -> Result<GenerationEntry, ControlError> {
+        let val = self.call("generation.get_current", serde_json::json!({}), None, None)?;
+        let current: GenerationEntry = serde_json::from_value(val)?;
+        Ok(current)
+    }
+
+    pub fn generation_list(&mut self) -> Result<Vec<GenerationEntry>, ControlError> {
+        let val = self.call("generation.list", serde_json::json!({}), None, None)?;
+        let list: Vec<GenerationEntry> = serde_json::from_value(val)?;
+        Ok(list)
     }
 }

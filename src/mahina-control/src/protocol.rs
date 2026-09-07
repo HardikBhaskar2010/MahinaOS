@@ -118,6 +118,17 @@ pub struct StorageOverview {
     pub devices: Vec<BlockDeviceEntry>,
 }
 
+/// Strongly typed generation entry
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GenerationEntry {
+    pub id: u32,
+    pub description: String,
+    pub created_at_epoch_secs: u64,
+    pub is_current: bool,
+    pub is_healthy: bool,
+    pub kernel_version: String,
+}
+
 /// Strongly typed internal domain commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainCommand {
@@ -141,6 +152,8 @@ pub enum DomainCommand {
         fs_type: Option<String>,
         options: Option<String>,
     },
+    GenerationsGetCurrent,
+    GenerationsList,
 }
 
 impl DomainCommand {
@@ -253,6 +266,8 @@ impl DomainCommand {
                     options,
                 })
             }
+            "generation.get_current" | "generations.get_current" => Ok(Self::GenerationsGetCurrent),
+            "generation.list" | "generations.list" => Ok(Self::GenerationsList),
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -274,6 +289,8 @@ impl DomainCommand {
             Self::PackagesRemove { .. } => "packages.remove",
             Self::StorageList => "storage.list",
             Self::StorageMount { .. } => "storage.mount",
+            Self::GenerationsGetCurrent => "generation.get_current",
+            Self::GenerationsList => "generation.list",
         }
     }
 
@@ -284,7 +301,9 @@ impl DomainCommand {
             | Self::ServicesStatus { .. }
             | Self::UsersList
             | Self::PackagesList
-            | Self::StorageList => false,
+            | Self::StorageList
+            | Self::GenerationsGetCurrent
+            | Self::GenerationsList => false,
             Self::SystemReboot
             | Self::SystemShutdown
             | Self::ServicesStart { .. }
@@ -319,6 +338,8 @@ pub enum DomainResult {
     UsersList(Vec<UserEntry>),
     PackagesList(Vec<PackageEntry>),
     StorageOverview(StorageOverview),
+    GenerationCurrent(GenerationEntry),
+    GenerationsList(Vec<GenerationEntry>),
     SuccessMessage(String),
     Empty,
 }
@@ -332,6 +353,8 @@ impl DomainResult {
             Self::UsersList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::PackagesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::StorageOverview(overview) => serde_json::to_value(overview).unwrap_or(serde_json::Value::Null),
+            Self::GenerationCurrent(entry) => serde_json::to_value(entry).unwrap_or(serde_json::Value::Null),
+            Self::GenerationsList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }

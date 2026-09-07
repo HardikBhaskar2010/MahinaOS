@@ -34,7 +34,10 @@ fn print_help() {
          package remove <NAME>   Remove an installed package\n\n\
          STORAGE COMMANDS:\n  \
          storage list            List mounted filesystems and block storage devices\n  \
-         storage mount <SRC> <TGT> Mount a filesystem\n",
+         storage mount <SRC> <TGT> Mount a filesystem\n\n\
+         GENERATION COMMANDS:\n  \
+         generation current      Show currently active system generation\n  \
+         generation list         List all system generations and rollback targets\n",
         DEFAULT_SOCKET_PATH
     );
 }
@@ -433,6 +436,53 @@ fn main() {
                 Ok(msg) => println!("{}", msg),
                 Err(e) => {
                     eprintln!("Error: mount failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("current")) => {
+            match client.generation_get_current() {
+                Ok(gen) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&gen).unwrap_or_default());
+                    } else {
+                        println!("==================================================");
+                        println!("          Mahina Active System Generation");
+                        println!("==================================================");
+                        println!("  Generation ID:  #{}", gen.id);
+                        println!("  Description:    {}", gen.description);
+                        println!("  Status:         ACTIVE (Current Boot)");
+                        println!("  Healthy:        {}", if gen.is_healthy { "Yes" } else { "No (Watchdog Pending)" });
+                        println!("  Kernel Version: {}", gen.kernel_version);
+                        println!("==================================================");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to query current generation: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("list")) => {
+            match client.generation_list() {
+                Ok(gens) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&gens).unwrap_or_default());
+                    } else if gens.is_empty() {
+                        println!("No generations found.");
+                    } else {
+                        println!("{:<14} {:<12} {:<10} {:<36}", "GENERATION", "STATUS", "HEALTHY", "DESCRIPTION");
+                        println!("{:-<14} {:-<12} {:-<10} {:-<36}", "", "", "", "");
+                        for g in gens {
+                            let status = if g.is_current { "CURRENT" } else { "AVAILABLE" };
+                            let healthy = if g.is_healthy { "Yes" } else { "Pending" };
+                            let id_str = format!("#{}", g.id);
+                            println!("{:<14} {:<12} {:<10} {:<36}", id_str, status, healthy, g.description);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to list generations: {}", e);
                     process::exit(1);
                 }
             }
