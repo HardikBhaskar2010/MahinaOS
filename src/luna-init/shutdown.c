@@ -39,7 +39,7 @@ static void sleep_ms(int ms) {
     nanosleep(&ts, NULL);
 }
 
-void shutdown_run(shutdown_mode_t mode) {
+_Noreturn void shutdown_run(shutdown_mode_t mode) {
     g_shutting_down = 1;
 
     LUNA_INFO(COMP, "Shutdown initiated. Mode: %s",

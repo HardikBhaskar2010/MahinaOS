@@ -1,0 +1,30 @@
+---
+# MahinaOS Clang-Tidy Configuration
+# Authority: Volume VI / 01_coding_standards.md §5, Audit_08092026 §Lint
+# All first-party code must pass with zero warnings.
+# Vendored code (stb_image, unity) is explicitly excluded.
+
+Checks: >
+  -*,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  cert-*,
+  -cert-err33-c,
+  -cert-err34-c,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-braces-around-statements,
+  -readability-math-missing-parentheses,
+  -readability-function-cognitive-complexity
+
+WarningsAsErrors: '*'
+
+# POSIX Extended Regular Expression allowlist for first-party headers.
+# Vendored headers (stb_image.h, unity.h) are excluded by design.
+HeaderFilterRegex: 'src/(luna-init|luna-init-ctl|lgp-compositor)/.*|src/luna-splash/(frames|ipc|render)\.h'
+...

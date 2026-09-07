@@ -30,7 +30,7 @@ typedef enum {
  * Calls reboot(2) with LINUX_REBOOT_CMD_POWER_OFF or LINUX_REBOOT_CMD_RESTART.
  * This function does not return.
  */
-void shutdown_run(shutdown_mode_t mode);
+_Noreturn void shutdown_run(shutdown_mode_t mode);
 
 /* Global flag read by the event loop to stop accepting new service starts */
 extern volatile int g_shutting_down;

@@ -10,7 +10,11 @@
 #include "../protocol/caps.h"
 #include "../protocol/wm.h"
 
+#include <errno.h>
+#include <limits.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 static struct {
     int32_t x;
@@ -72,12 +76,6 @@ static void draw_software_cursor(void *dst, uint32_t dst_width, uint32_t dst_hei
     }
 }
 
-
-#include <errno.h>
-#include <limits.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
 #define LGP_BYTES_PER_PIXEL_XRGB8888 4U
 #define LGP_LUNA_VOID_XRGB8888 0x000A0A0FU

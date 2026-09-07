@@ -255,11 +255,9 @@ int main(void) {
 
                     case SIGNAL_ACTION_SHUTDOWN:
                         shutdown_run(SHUTDOWN_POWEROFF);
-                        break; /* not reached */
 
                     case SIGNAL_ACTION_REBOOT:
                         shutdown_run(SHUTDOWN_REBOOT);
-                        break; /* not reached */
 
                     case SIGNAL_ACTION_RELOAD:
                         LUNA_INFO("luna-init", "Reloading service definitions");
@@ -281,8 +279,6 @@ int main(void) {
                     }
 
                     case SIGNAL_ACTION_READY:
-                        break;
-
                     case SIGNAL_ACTION_NONE:
                     default:
                         break;
