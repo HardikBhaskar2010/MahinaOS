@@ -88,8 +88,8 @@ Provides a background gradient wallpaper, top status bar, cascading window manag
 | Window management | ✅ Complete | Privileged WM client (`luna-shell`) cascades and focuses windows. |
 | Input (pointer) | ✅ Complete | evdev motion/button events routed to widget hit-testing. |
 | Input (keyboard) | ✅ Complete | evdev key events routed to focused surface/widget with global WM grabs. |
-| Runtime / AI (luna-ai-d) | 🔴 Not started | Qwen2.5 3B local LLM runtime planned. |
-| Package manager (lpkg) | 🔴 Not started | Custom atomic packager planned. |
+| Runtime / AI (luna-ai-d) | ✅ Complete | C17 daemon with streaming Ollama HTTP proxy and presence reporting. |
+| Package manager (lpkg) | ✅ Complete | Custom packager in C17 with Ed25519 signature verification (libsodium). |
 | Installer (luna-installer) | 🟡 UI complete, backend missing | 10-page flow works; no real disk write. |
 | Shell / desktop (luna-shell) | ✅ Complete | Desktop shell with wallpaper, top bar, and hotkeys. |
 | Terminal (luna-terminal) | ✅ Complete | ANSI VT100 parser over PTY with scrollback and PTY resize. |
