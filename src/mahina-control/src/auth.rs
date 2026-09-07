@@ -100,12 +100,13 @@ impl CapabilityAuthorizer {
         let tier = IdentityTier::from_uid(peer.uid);
 
         match command {
-            // Read-only system state, service, user, & package queries: accessible to any caller with socket transport access
+            // Read-only system state, service, user, package, & storage queries: accessible to any caller with socket transport access
             DomainCommand::SystemGetState
             | DomainCommand::ServicesList
             | DomainCommand::ServicesStatus { .. }
             | DomainCommand::UsersList
-            | DomainCommand::PackagesList => Ok(tier),
+            | DomainCommand::PackagesList
+            | DomainCommand::StorageList => Ok(tier),
 
             // Privileged mutating operations: requires root/admin or valid capability token
             DomainCommand::SystemReboot | DomainCommand::SystemShutdown => {
@@ -202,6 +203,31 @@ impl CapabilityAuthorizer {
                     Err(ControlError::PermissionDenied(format!(
                         "Caller '{}' (UID {}) lacks authority to remove package '{}'. Requires root or Capability Token.",
                         tier.as_str(), peer.uid, name
+                    )))
+                }
+            }
+
+            DomainCommand::StorageMount { source, target, .. } => {
+                if tier.is_privileged() {
+                    return Ok(tier);
+                }
+
+                if let Some(t) = token {
+                    if t.is_empty() {
+                        return Err(ControlError::TokenInvalid("Empty capability token".to_string()));
+                    }
+                    if t.contains("storage.mutate") || t.contains("storage.mount") {
+                        Ok(tier)
+                    } else {
+                        Err(ControlError::PermissionDenied(format!(
+                            "Capability token lacks required scope to mount '{}' on '{}'",
+                            source, target
+                        )))
+                    }
+                } else {
+                    Err(ControlError::PermissionDenied(format!(
+                        "Caller '{}' (UID {}) lacks authority to mount '{}' on '{}'. Requires root or Capability Token.",
+                        tier.as_str(), peer.uid, source, target
                     )))
                 }
             }

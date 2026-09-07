@@ -1,7 +1,8 @@
 use crate::daemon::DEFAULT_SOCKET_PATH;
 use crate::error::ControlError;
 use crate::protocol::{
-    PackageEntry, Request, Response, ServiceEntry, ServiceStatus, SystemState, UserEntry,
+    PackageEntry, Request, Response, ServiceEntry, ServiceStatus, StorageOverview, SystemState,
+    UserEntry,
 };
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
@@ -175,6 +176,36 @@ impl ControlClient {
             token,
         )?;
         let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Removed").to_string();
+        Ok(msg)
+    }
+
+    pub fn storage_list(&mut self) -> Result<StorageOverview, ControlError> {
+        let val = self.call("storage.list", serde_json::json!({}), None, None)?;
+        let overview: StorageOverview = serde_json::from_value(val)?;
+        Ok(overview)
+    }
+
+    pub fn storage_mount(
+        &mut self,
+        source: &str,
+        target: &str,
+        fs_type: Option<&str>,
+        options: Option<&str>,
+        token: Option<String>,
+    ) -> Result<String, ControlError> {
+        let mut params = serde_json::json!({
+            "source": source,
+            "target": target,
+        });
+        if let Some(fst) = fs_type {
+            params["fs_type"] = serde_json::Value::String(fst.to_string());
+        }
+        if let Some(opts) = options {
+            params["options"] = serde_json::Value::String(opts.to_string());
+        }
+
+        let val = self.call("storage.mount", params, None, token)?;
+        let msg = val.get("message").and_then(|m| m.as_str()).unwrap_or("Mounted").to_string();
         Ok(msg)
     }
 }

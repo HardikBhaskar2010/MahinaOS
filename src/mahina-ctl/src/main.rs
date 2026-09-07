@@ -31,9 +31,31 @@ fn print_help() {
          PACKAGE COMMANDS:\n  \
          package list            List installed software packages\n  \
          package install <TARGET> Install a package (.lpkg or repository package)\n  \
-         package remove <NAME>   Remove an installed package\n",
+         package remove <NAME>   Remove an installed package\n\n\
+         STORAGE COMMANDS:\n  \
+         storage list            List mounted filesystems and block storage devices\n  \
+         storage mount <SRC> <TGT> Mount a filesystem\n",
         DEFAULT_SOCKET_PATH
     );
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = 1024 * 1024;
+    const GIB: u64 = 1024 * 1024 * 1024;
+    const TIB: u64 = 1024 * 1024 * 1024 * 1024;
+
+    if bytes >= TIB {
+        format!("{:.2} TiB", bytes as f64 / TIB as f64)
+    } else if bytes >= GIB {
+        format!("{:.2} GiB", bytes as f64 / GIB as f64)
+    } else if bytes >= MIB {
+        format!("{:.2} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.2} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
 }
 
 fn format_uptime(secs: u64) -> String {
@@ -359,6 +381,58 @@ fn main() {
                 Ok(msg) => println!("{}", msg),
                 Err(e) => {
                     eprintln!("Error: package remove failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("storage") | Some("disk") | Some("disks"), Some("list")) => {
+            match client.storage_list() {
+                Ok(overview) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&overview).unwrap_or_default());
+                    } else {
+                        println!("=== MOUNTED FILESYSTEMS ===");
+                        println!("{:<24} {:<18} {:<10} {:<14} {:<24}", "DEVICE", "MOUNT POINT", "FS TYPE", "SUBVOLUME", "OPTIONS");
+                        println!("{:-<24} {:-<18} {:-<10} {:-<14} {:-<24}", "", "", "", "", "");
+                        for m in overview.mounts {
+                            let sub = m.subvolume.unwrap_or_else(|| "-".to_string());
+                            println!("{:<24} {:<18} {:<10} {:<14} {:<24}", m.device, m.mount_point, m.fs_type, sub, m.options);
+                        }
+                        println!("\n=== BLOCK STORAGE DEVICES ===");
+                        println!("{:<16} {:<14} {:<12} {:<12}", "DEVICE", "SIZE", "TYPE", "READ-ONLY");
+                        println!("{:-<16} {:-<14} {:-<12} {:-<12}", "", "", "", "");
+                        for d in overview.devices {
+                            let typ = if d.is_rotational { "HDD" } else { "SSD/NVMe" };
+                            let ro = if d.is_read_only { "Yes" } else { "No" };
+                            println!("{:<16} {:<14} {:<12} {:<12}", d.name, format_bytes(d.size_bytes), typ, ro);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to query storage: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("storage"), Some("mount")) => {
+            let source = match target {
+                Some(s) => s,
+                None => {
+                    eprintln!("Error: storage mount requires source device/path and target mount point");
+                    process::exit(1);
+                }
+            };
+            let mount_target = match positional.get(3).map(|s| s.as_str()) {
+                Some(t) => t,
+                None => {
+                    eprintln!("Error: storage mount requires a target mount point");
+                    process::exit(1);
+                }
+            };
+            match client.storage_mount(source, mount_target, None, None, token) {
+                Ok(msg) => println!("{}", msg),
+                Err(e) => {
+                    eprintln!("Error: mount failed: {}", e);
                     process::exit(1);
                 }
             }

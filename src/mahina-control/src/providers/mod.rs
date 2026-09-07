@@ -1,5 +1,6 @@
 pub mod package;
 pub mod service;
+pub mod storage;
 pub mod system;
 pub mod user;
 
@@ -7,6 +8,7 @@ use crate::error::ControlError;
 use crate::protocol::{DomainCommand, DomainResult};
 use self::package::PackageProvider;
 use self::service::ServiceProvider;
+use self::storage::StorageProvider;
 use self::system::SystemProvider;
 use self::user::UserProvider;
 
@@ -15,6 +17,7 @@ pub struct ProviderDispatcher {
     pub service: ServiceProvider,
     pub user: UserProvider,
     pub package: PackageProvider,
+    pub storage: StorageProvider,
 }
 
 impl ProviderDispatcher {
@@ -24,6 +27,7 @@ impl ProviderDispatcher {
             service: ServiceProvider::new(),
             user: UserProvider::new(),
             package: PackageProvider::new(),
+            storage: StorageProvider::new(),
         }
     }
 
@@ -32,12 +36,14 @@ impl ProviderDispatcher {
         service: ServiceProvider,
         user: UserProvider,
         package: PackageProvider,
+        storage: StorageProvider,
     ) -> Self {
         Self {
             system,
             service,
             user,
             package,
+            storage,
         }
     }
 
@@ -93,6 +99,19 @@ impl ProviderDispatcher {
             }
             DomainCommand::PackagesRemove { name } => {
                 let msg = self.package.remove(&name)?;
+                Ok(DomainResult::SuccessMessage(msg))
+            }
+            DomainCommand::StorageList => {
+                let overview = self.storage.get_overview()?;
+                Ok(DomainResult::StorageOverview(overview))
+            }
+            DomainCommand::StorageMount {
+                source,
+                target,
+                fs_type,
+                options,
+            } => {
+                let msg = self.storage.mount(&source, &target, fs_type.as_deref(), options.as_deref())?;
                 Ok(DomainResult::SuccessMessage(msg))
             }
         }

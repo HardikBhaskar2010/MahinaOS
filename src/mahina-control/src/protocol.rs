@@ -92,6 +92,32 @@ pub struct PackageEntry {
     pub file_count: usize,
 }
 
+/// Strongly typed filesystem mount entry
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MountEntry {
+    pub device: String,
+    pub mount_point: String,
+    pub fs_type: String,
+    pub options: String,
+    pub subvolume: Option<String>,
+}
+
+/// Strongly typed block device entry
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockDeviceEntry {
+    pub name: String,
+    pub size_bytes: u64,
+    pub is_rotational: bool,
+    pub is_read_only: bool,
+}
+
+/// Strongly typed holistic storage overview
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StorageOverview {
+    pub mounts: Vec<MountEntry>,
+    pub devices: Vec<BlockDeviceEntry>,
+}
+
 /// Strongly typed internal domain commands
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainCommand {
@@ -108,6 +134,13 @@ pub enum DomainCommand {
     PackagesList,
     PackagesInstall { target: String },
     PackagesRemove { name: String },
+    StorageList,
+    StorageMount {
+        source: String,
+        target: String,
+        fs_type: Option<String>,
+        options: Option<String>,
+    },
 }
 
 impl DomainCommand {
@@ -195,6 +228,31 @@ impl DomainCommand {
                     name: name.to_string(),
                 })
             }
+            "storage.list" => Ok(Self::StorageList),
+            "storage.mount" => {
+                let source = params
+                    .get("source")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "source".to_string(),
+                        reason: "Missing required parameter 'source'".to_string(),
+                    })?;
+                let target = params
+                    .get("target")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "target".to_string(),
+                        reason: "Missing required parameter 'target'".to_string(),
+                    })?;
+                let fs_type = params.get("fs_type").and_then(|v| v.as_str()).map(|s| s.to_string());
+                let options = params.get("options").and_then(|v| v.as_str()).map(|s| s.to_string());
+                Ok(Self::StorageMount {
+                    source: source.to_string(),
+                    target: target.to_string(),
+                    fs_type,
+                    options,
+                })
+            }
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -214,6 +272,8 @@ impl DomainCommand {
             Self::PackagesList => "packages.list",
             Self::PackagesInstall { .. } => "packages.install",
             Self::PackagesRemove { .. } => "packages.remove",
+            Self::StorageList => "storage.list",
+            Self::StorageMount { .. } => "storage.mount",
         }
     }
 
@@ -223,7 +283,8 @@ impl DomainCommand {
             | Self::ServicesList
             | Self::ServicesStatus { .. }
             | Self::UsersList
-            | Self::PackagesList => false,
+            | Self::PackagesList
+            | Self::StorageList => false,
             Self::SystemReboot
             | Self::SystemShutdown
             | Self::ServicesStart { .. }
@@ -231,7 +292,8 @@ impl DomainCommand {
             | Self::ServicesRestart { .. }
             | Self::ServicesReload { .. }
             | Self::PackagesInstall { .. }
-            | Self::PackagesRemove { .. } => true,
+            | Self::PackagesRemove { .. }
+            | Self::StorageMount { .. } => true,
         }
     }
 }
@@ -256,6 +318,7 @@ pub enum DomainResult {
     ServiceStatus(ServiceStatus),
     UsersList(Vec<UserEntry>),
     PackagesList(Vec<PackageEntry>),
+    StorageOverview(StorageOverview),
     SuccessMessage(String),
     Empty,
 }
@@ -268,6 +331,7 @@ impl DomainResult {
             Self::ServiceStatus(status) => serde_json::to_value(status).unwrap_or(serde_json::Value::Null),
             Self::UsersList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
             Self::PackagesList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
+            Self::StorageOverview(overview) => serde_json::to_value(overview).unwrap_or(serde_json::Value::Null),
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }
