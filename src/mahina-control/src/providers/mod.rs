@@ -53,7 +53,7 @@ impl ProviderDispatcher {
         }
     }
 
-    pub fn dispatch(&self, command: DomainCommand) -> Result<DomainResult, ControlError> {
+    pub fn dispatch(&self, command: DomainCommand, peer: &crate::auth::PeerCredentials) -> Result<DomainResult, ControlError> {
         match command {
             DomainCommand::SystemGetState => {
                 let state = self.system.get_state()?;
@@ -128,6 +128,37 @@ impl ProviderDispatcher {
                 let list = self.generation.list()?;
                 Ok(DomainResult::GenerationsList(list))
             }
+            DomainCommand::GenerationsCreate { description } => {
+                let entry = self.generation.create(&description)?;
+                Ok(DomainResult::GenerationCurrent(entry))
+            }
+            DomainCommand::GenerationsActivate { id } => {
+                let msg = self.generation.activate(id)?;
+                Ok(DomainResult::ActionSuccess {
+                    action: "generation.activate".to_string(),
+                    details: msg,
+                })
+            }
+            DomainCommand::GenerationsMarkHealthy { id } => {
+                let entry = self.generation.mark_healthy(id, peer)?;
+                Ok(DomainResult::GenerationCurrent(entry))
+            }
+            DomainCommand::GenerationsRollback { target_id } => {
+                let entry = self.generation.rollback(target_id)?;
+                Ok(DomainResult::GenerationCurrent(entry))
+            }
+            DomainCommand::GenerationsPin { id, pin } => {
+                self.generation.pin(id, pin)?;
+                let status = if pin { "pinned" } else { "unpinned" };
+                Ok(DomainResult::ActionSuccess {
+                    action: "generation.pin".to_string(),
+                    details: format!("Generation #{} successfully {}", id, status),
+                })
+            }
+            DomainCommand::GenerationsRecoveryCapabilities => {
+                let caps = self.generation.recovery_capabilities();
+                Ok(DomainResult::RecoveryCapabilities(caps))
+            }
         }
     }
 }
@@ -145,7 +176,8 @@ mod tests {
     #[test]
     fn test_dispatcher_system_get_state() {
         let dispatcher = ProviderDispatcher::new();
-        let res = dispatcher.dispatch(DomainCommand::SystemGetState).expect("dispatch failed");
+        let peer = crate::auth::PeerCredentials { uid: 0, gid: 0, pid: 1 };
+        let res = dispatcher.dispatch(DomainCommand::SystemGetState, &peer).expect("dispatch failed");
         match res {
             DomainResult::SystemState(s) => {
                 assert!(s.active_generation >= 100);

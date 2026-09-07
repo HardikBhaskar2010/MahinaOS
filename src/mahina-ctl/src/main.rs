@@ -37,7 +37,14 @@ fn print_help() {
          storage mount <SRC> <TGT> Mount a filesystem\n\n\
          GENERATION COMMANDS:\n  \
          generation current      Show currently active system generation\n  \
-         generation list         List all system generations and rollback targets\n",
+         generation list         List all system generations and rollback targets\n  \
+         generation create <DESC> Create a new candidate generation snapshot\n  \
+         generation activate <ID> Schedule candidate generation for trial boot\n  \
+         generation mark-healthy Assert health and promote generation to default\n  \
+         generation rollback [ID] Roll back to fallback or designated generation\n  \
+         generation pin <ID>     Protect generation from automated retention pruning\n  \
+         generation unpin <ID>   Remove retention pin from generation\n  \
+         generation capabilities Display boot watchdog and recovery capabilities\n",
         DEFAULT_SOCKET_PATH
     );
 }
@@ -483,6 +490,122 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("Error: failed to list generations: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("create")) => {
+            let desc = positional.get(2).map(|s| s.as_str()).unwrap_or("Manual snapshot");
+            match client.generation_create(desc, token) {
+                Ok(gen) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&gen).unwrap_or_default());
+                    } else {
+                        println!("Candidate generation created successfully:");
+                        println!("  Generation ID:  #{}", gen.id);
+                        println!("  Description:    {}", gen.description);
+                        println!("  Status:         STAGED");
+                        println!("\nNext step: Run 'mahina-ctl generation activate {}' to schedule for trial boot.", gen.id);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to create candidate generation: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("activate")) => {
+            let id = positional.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or_else(|| {
+                eprintln!("Error: 'generation activate' requires a generation ID");
+                process::exit(1);
+            });
+            match client.generation_activate(id, token) {
+                Ok(details) => {
+                    if json_mode {
+                        println!("{}", serde_json::json!({ "status": "activated", "id": id, "details": details }));
+                    } else {
+                        println!("Generation #{} activated successfully.", id);
+                        println!("  Details: {}", details);
+                        println!("  Reboot to begin trial boot with boot attempt counter.");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to activate candidate generation: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("mark-healthy") | Some("mark_healthy")) => {
+            let id = positional.get(2).and_then(|s| s.parse::<u32>().ok());
+            match client.generation_mark_healthy(id, token) {
+                Ok(gen) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&gen).unwrap_or_default());
+                    } else {
+                        println!("Generation #{} verified HEALTHY and promoted to default boot entry.", gen.id);
+                        println!("  Description: {}", gen.description);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to mark generation healthy: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("rollback")) => {
+            let target_id = positional.get(2).and_then(|s| s.parse::<u32>().ok());
+            match client.generation_rollback(target_id, token) {
+                Ok(gen) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&gen).unwrap_or_default());
+                    } else {
+                        println!("Rollback initiated successfully.");
+                        println!("  Default boot entry reverted to Generation #{}: {}", gen.id, gen.description);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: rollback failed: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("pin")) => {
+            let id = positional.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or_else(|| {
+                eprintln!("Error: 'generation pin' requires a generation ID");
+                process::exit(1);
+            });
+            match client.generation_pin(id, true, token) {
+                Ok(details) => println!("{}", details),
+                Err(e) => {
+                    eprintln!("Error: failed to pin generation: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("unpin")) => {
+            let id = positional.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or_else(|| {
+                eprintln!("Error: 'generation unpin' requires a generation ID");
+                process::exit(1);
+            });
+            match client.generation_pin(id, false, token) {
+                Ok(details) => println!("{}", details),
+                Err(e) => {
+                    eprintln!("Error: failed to unpin generation: {}", e);
+                    process::exit(1);
+                }
+            }
+        }
+        (Some("generation") | Some("generations"), Some("capabilities")) => {
+            match client.generation_capabilities() {
+                Ok(caps) => {
+                    if json_mode {
+                        println!("{}", serde_json::to_string_pretty(&caps).unwrap_or_default());
+                    } else {
+                        println!("{}", caps.display_summary());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: failed to query recovery capabilities: {}", e);
                     process::exit(1);
                 }
             }

@@ -3,41 +3,56 @@
  * Licensed under the MIT License.
  *
  * generation.rs — Generation Provider backed by the isolated StateStore (/system/mahina-state).
- *                 Single-writer provider orchestrating generation listings, current active
- *                 generation telemetry, and pin management.
+ *                 Single-writer provider orchestrating generation listings, candidate creation,
+ *                 TOCTOU-safe activation, health attestation, rollback, and pin management.
  */
 
+use crate::auth::PeerCredentials;
+use crate::boot::RecoveryCapabilities;
 use crate::error::ControlError;
+use crate::lifecycle::GenerationLifecycleManager;
 use crate::protocol::GenerationEntry;
 use crate::state::{GenerationStatus, StateStore, DEFAULT_BASELINE_GEN_ID};
 use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct GenerationProvider {
-    state_store: StateStore,
+    lifecycle_mgr: GenerationLifecycleManager,
 }
 
 impl GenerationProvider {
     pub fn new() -> Self {
         Self {
-            state_store: StateStore::new(),
+            lifecycle_mgr: GenerationLifecycleManager::new(),
         }
+    }
+
+    pub fn with_lifecycle(mgr: GenerationLifecycleManager) -> Self {
+        Self { lifecycle_mgr: mgr }
     }
 
     pub fn with_state_dir(state_dir: impl AsRef<Path>) -> Self {
-        Self {
-            state_store: StateStore::with_dir(state_dir),
-        }
+        let mgr = GenerationLifecycleManager::with_paths(
+            state_dir,
+            "/generations",
+            "/boot/efi/limine.conf",
+            false,
+        );
+        Self { lifecycle_mgr: mgr }
     }
 
     pub fn state_store(&self) -> &StateStore {
-        &self.state_store
+        self.lifecycle_mgr.state_store()
+    }
+
+    pub fn recovery_capabilities(&self) -> RecoveryCapabilities {
+        self.lifecycle_mgr.recovery_capabilities()
     }
 
     pub fn get_current(&self) -> Result<GenerationEntry, ControlError> {
-        if let Ok(reg) = self.state_store.load_registry() {
+        if let Ok(reg) = self.state_store().load_registry() {
             let cur_id = reg.current_generation_id;
-            if let Ok(manifest) = self.state_store.load_manifest(cur_id) {
+            if let Ok(manifest) = self.state_store().load_manifest(cur_id) {
                 return Ok(GenerationEntry {
                     id: manifest.id,
                     description: manifest.description,
@@ -71,11 +86,11 @@ impl GenerationProvider {
     }
 
     pub fn list(&self) -> Result<Vec<GenerationEntry>, ControlError> {
-        if let Ok(reg) = self.state_store.load_registry() {
+        if let Ok(reg) = self.state_store().load_registry() {
             let mut entries = Vec::new();
             for s in reg.generations {
                 let kernel_ver = self
-                    .state_store
+                    .state_store()
                     .load_manifest(s.id)
                     .map(|m| m.kernel_version)
                     .unwrap_or_else(|_| "Linux 6.6-mahina".to_string());
@@ -107,8 +122,64 @@ impl GenerationProvider {
         }])
     }
 
+    pub fn create(&self, description: &str) -> Result<GenerationEntry, ControlError> {
+        let manifest = self.lifecycle_mgr.create_candidate(
+            Path::new("/"),
+            description,
+            "Linux 6.6-mahina",
+            "[]",
+            "k_default",
+            "initrd_default",
+        )?;
+
+        Ok(GenerationEntry {
+            id: manifest.id,
+            description: manifest.description,
+            created_at_epoch_secs: manifest.created_at_epoch_secs,
+            is_current: false,
+            is_healthy: false,
+            kernel_version: manifest.kernel_version,
+        })
+    }
+
+    pub fn activate(&self, id: u32) -> Result<String, ControlError> {
+        let boot_state = self.lifecycle_mgr.activate_candidate(id)?;
+        Ok(format!(
+            "Candidate generation #{} activated for trial boot (max attempts: {})",
+            boot_state.generation_id, boot_state.max_attempts
+        ))
+    }
+
+    pub fn mark_healthy(
+        &self,
+        id: Option<u32>,
+        caller: &PeerCredentials,
+    ) -> Result<GenerationEntry, ControlError> {
+        let manifest = self.lifecycle_mgr.attest_and_mark_healthy(id, caller)?;
+        Ok(GenerationEntry {
+            id: manifest.id,
+            description: manifest.description,
+            created_at_epoch_secs: manifest.created_at_epoch_secs,
+            is_current: true,
+            is_healthy: true,
+            kernel_version: manifest.kernel_version,
+        })
+    }
+
+    pub fn rollback(&self, target_id: Option<u32>) -> Result<GenerationEntry, ControlError> {
+        let summary = self.lifecycle_mgr.rollback(target_id)?;
+        Ok(GenerationEntry {
+            id: summary.id,
+            description: summary.description,
+            created_at_epoch_secs: summary.created_at_epoch_secs,
+            is_current: true,
+            is_healthy: true,
+            kernel_version: "Linux 6.6-mahina".to_string(),
+        })
+    }
+
     pub fn pin(&self, id: u32, pinned: bool) -> Result<(), ControlError> {
-        self.state_store.set_pinned(id, pinned)
+        self.state_store().set_pinned(id, pinned)
     }
 }
 

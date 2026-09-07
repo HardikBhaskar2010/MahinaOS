@@ -112,7 +112,7 @@ impl ControlDaemon {
         };
 
         // Dispatch command to domain provider
-        let response = match self.dispatcher.dispatch(cmd.clone()) {
+        let response = match self.dispatcher.dispatch(cmd.clone(), peer) {
             Ok(domain_res) => {
                 self.audit.log(
                     req.request_id.clone(),

@@ -154,6 +154,12 @@ pub enum DomainCommand {
     },
     GenerationsGetCurrent,
     GenerationsList,
+    GenerationsCreate { description: String },
+    GenerationsActivate { id: u32 },
+    GenerationsMarkHealthy { id: Option<u32> },
+    GenerationsRollback { target_id: Option<u32> },
+    GenerationsPin { id: u32, pin: bool },
+    GenerationsRecoveryCapabilities,
 }
 
 impl DomainCommand {
@@ -268,6 +274,55 @@ impl DomainCommand {
             }
             "generation.get_current" | "generations.get_current" => Ok(Self::GenerationsGetCurrent),
             "generation.list" | "generations.list" => Ok(Self::GenerationsList),
+            "generation.create" | "generations.create" => {
+                let desc = params
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("User created generation snapshot");
+                Ok(Self::GenerationsCreate {
+                    description: desc.to_string(),
+                })
+            }
+            "generation.activate" | "generations.activate" => {
+                let id = params
+                    .get("id")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32)
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "id".to_string(),
+                        reason: "Missing required parameter 'id'".to_string(),
+                    })?;
+                Ok(Self::GenerationsActivate { id })
+            }
+            "generation.mark_healthy" | "generations.mark_healthy" => {
+                let id = params
+                    .get("id")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32);
+                Ok(Self::GenerationsMarkHealthy { id })
+            }
+            "generation.rollback" | "generations.rollback" => {
+                let target_id = params
+                    .get("target_id")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32);
+                Ok(Self::GenerationsRollback { target_id })
+            }
+            "generation.pin" | "generations.pin" => {
+                let id = params
+                    .get("id")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32)
+                    .ok_or_else(|| ControlError::InvalidParameter {
+                        param: "id".to_string(),
+                        reason: "Missing required parameter 'id'".to_string(),
+                    })?;
+                let pin = params.get("pin").and_then(|v| v.as_bool()).unwrap_or(true);
+                Ok(Self::GenerationsPin { id, pin })
+            }
+            "generation.capabilities" | "generations.capabilities" => {
+                Ok(Self::GenerationsRecoveryCapabilities)
+            }
             other => Err(ControlError::NotFound(format!("Unknown method '{}'", other))),
         }
     }
@@ -291,6 +346,12 @@ impl DomainCommand {
             Self::StorageMount { .. } => "storage.mount",
             Self::GenerationsGetCurrent => "generation.get_current",
             Self::GenerationsList => "generation.list",
+            Self::GenerationsCreate { .. } => "generation.create",
+            Self::GenerationsActivate { .. } => "generation.activate",
+            Self::GenerationsMarkHealthy { .. } => "generation.mark_healthy",
+            Self::GenerationsRollback { .. } => "generation.rollback",
+            Self::GenerationsPin { .. } => "generation.pin",
+            Self::GenerationsRecoveryCapabilities => "generation.capabilities",
         }
     }
 
@@ -303,7 +364,8 @@ impl DomainCommand {
             | Self::PackagesList
             | Self::StorageList
             | Self::GenerationsGetCurrent
-            | Self::GenerationsList => false,
+            | Self::GenerationsList
+            | Self::GenerationsRecoveryCapabilities => false,
             Self::SystemReboot
             | Self::SystemShutdown
             | Self::ServicesStart { .. }
@@ -312,7 +374,12 @@ impl DomainCommand {
             | Self::ServicesReload { .. }
             | Self::PackagesInstall { .. }
             | Self::PackagesRemove { .. }
-            | Self::StorageMount { .. } => true,
+            | Self::StorageMount { .. }
+            | Self::GenerationsCreate { .. }
+            | Self::GenerationsActivate { .. }
+            | Self::GenerationsMarkHealthy { .. }
+            | Self::GenerationsRollback { .. }
+            | Self::GenerationsPin { .. } => true,
         }
     }
 }
@@ -340,6 +407,8 @@ pub enum DomainResult {
     StorageOverview(StorageOverview),
     GenerationCurrent(GenerationEntry),
     GenerationsList(Vec<GenerationEntry>),
+    RecoveryCapabilities(crate::boot::RecoveryCapabilities),
+    ActionSuccess { action: String, details: String },
     SuccessMessage(String),
     Empty,
 }
@@ -355,6 +424,10 @@ impl DomainResult {
             Self::StorageOverview(overview) => serde_json::to_value(overview).unwrap_or(serde_json::Value::Null),
             Self::GenerationCurrent(entry) => serde_json::to_value(entry).unwrap_or(serde_json::Value::Null),
             Self::GenerationsList(list) => serde_json::to_value(list).unwrap_or(serde_json::Value::Null),
+            Self::RecoveryCapabilities(caps) => serde_json::to_value(caps).unwrap_or(serde_json::Value::Null),
+            Self::ActionSuccess { action, details } => {
+                serde_json::json!({ "action": action, "details": details })
+            }
             Self::SuccessMessage(msg) => serde_json::json!({ "message": msg }),
             Self::Empty => serde_json::json!({}),
         }

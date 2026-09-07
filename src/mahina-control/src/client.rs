@@ -220,4 +220,63 @@ impl ControlClient {
         let list: Vec<GenerationEntry> = serde_json::from_value(val)?;
         Ok(list)
     }
+
+    pub fn generation_create(&mut self, description: &str, token: Option<String>) -> Result<GenerationEntry, ControlError> {
+        let val = self.call(
+            "generation.create",
+            serde_json::json!({ "description": description }),
+            None,
+            token,
+        )?;
+        let entry: GenerationEntry = serde_json::from_value(val)?;
+        Ok(entry)
+    }
+
+    pub fn generation_activate(&mut self, id: u32, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "generation.activate",
+            serde_json::json!({ "id": id }),
+            None,
+            token,
+        )?;
+        let details = val.get("details").and_then(|d| d.as_str()).unwrap_or("Activated").to_string();
+        Ok(details)
+    }
+
+    pub fn generation_mark_healthy(&mut self, id: Option<u32>, token: Option<String>) -> Result<GenerationEntry, ControlError> {
+        let mut params = serde_json::json!({});
+        if let Some(gen_id) = id {
+            params["id"] = serde_json::json!(gen_id);
+        }
+        let val = self.call("generation.mark_healthy", params, None, token)?;
+        let entry: GenerationEntry = serde_json::from_value(val)?;
+        Ok(entry)
+    }
+
+    pub fn generation_rollback(&mut self, target_id: Option<u32>, token: Option<String>) -> Result<GenerationEntry, ControlError> {
+        let mut params = serde_json::json!({});
+        if let Some(target) = target_id {
+            params["target_id"] = serde_json::json!(target);
+        }
+        let val = self.call("generation.rollback", params, None, token)?;
+        let entry: GenerationEntry = serde_json::from_value(val)?;
+        Ok(entry)
+    }
+
+    pub fn generation_pin(&mut self, id: u32, pin: bool, token: Option<String>) -> Result<String, ControlError> {
+        let val = self.call(
+            "generation.pin",
+            serde_json::json!({ "id": id, "pin": pin }),
+            None,
+            token,
+        )?;
+        let details = val.get("details").and_then(|d| d.as_str()).unwrap_or("Pinned updated").to_string();
+        Ok(details)
+    }
+
+    pub fn generation_capabilities(&mut self) -> Result<crate::boot::RecoveryCapabilities, ControlError> {
+        let val = self.call("generation.capabilities", serde_json::json!({}), None, None)?;
+        let caps: crate::boot::RecoveryCapabilities = serde_json::from_value(val)?;
+        Ok(caps)
+    }
 }

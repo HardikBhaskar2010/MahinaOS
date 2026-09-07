@@ -233,6 +233,52 @@ impl CapabilityAuthorizer {
                     )))
                 }
             }
+
+            DomainCommand::GenerationsRecoveryCapabilities => Ok(tier),
+
+            DomainCommand::GenerationsMarkHealthy { id: _ } => {
+                // System Attestation Path: luna-init PID 1 (UID 0) or valid attestation token
+                if peer.uid == 0 {
+                    return Ok(tier);
+                }
+
+                if let Some(t) = token {
+                    if t.contains("system.attest") || t.contains("generation.mark_healthy") {
+                        return Ok(tier);
+                    }
+                }
+
+                Err(ControlError::PermissionDenied(
+                    "Health attestation requires system root credentials (UID 0) or system attestation token".to_string(),
+                ))
+            }
+
+            DomainCommand::GenerationsCreate { .. }
+            | DomainCommand::GenerationsActivate { .. }
+            | DomainCommand::GenerationsRollback { .. }
+            | DomainCommand::GenerationsPin { .. } => {
+                if tier.is_privileged() {
+                    return Ok(tier);
+                }
+
+                if let Some(t) = token {
+                    if t.is_empty() {
+                        return Err(ControlError::TokenInvalid("Empty capability token".to_string()));
+                    }
+                    if t.contains("generation.mutate") || t.contains("boot.modify") || t.contains("system.modify") {
+                        Ok(tier)
+                    } else {
+                        Err(ControlError::PermissionDenied(
+                            "Capability token lacks required scope ('generation.mutate' or 'boot.modify')".to_string(),
+                        ))
+                    }
+                } else {
+                    Err(ControlError::PermissionDenied(format!(
+                        "Caller '{}' (UID {}) lacks authority for generation mutation. Requires root or Capability Token.",
+                        tier.as_str(), peer.uid
+                    )))
+                }
+            }
         }
     }
 }
