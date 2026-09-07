@@ -6,6 +6,8 @@ pub mod error;
 pub mod idempotency;
 pub mod protocol;
 pub mod providers;
+pub mod sha256;
+pub mod state;
 
 pub use audit::AuditLogger;
 pub use auth::{CapabilityAuthorizer, IdentityTier, PeerCredentials};
@@ -15,3 +17,8 @@ pub use error::ControlError;
 pub use idempotency::IdempotencyStore;
 pub use protocol::{DomainCommand, DomainResult, Request, Response, SystemState};
 pub use providers::ProviderDispatcher;
+pub use sha256::Sha256;
+pub use state::{
+    BootHealthStatus, BootStage, BootState, GenerationManifest, GenerationRegistry,
+    GenerationStatus, GenerationSummary, StateStore,
+};
