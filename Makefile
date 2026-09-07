@@ -395,7 +395,6 @@ test-unit: $(UNITY_OBJ) $(filter-out $(BUILD_DIR)/luna-init/main_test_asan.o, $(
 	    echo "  RUN     $$name"; \
 	    $(BUILD_DIR)/tests/$$name || failed=1; \
 	done; \
-
 	if [ $$failed -eq 0 ]; then \
 	    echo "  PASS    All unit tests passed"; \
 	else \
