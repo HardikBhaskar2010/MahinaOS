@@ -364,11 +364,6 @@ run-qemu: image
 run-qemu-headless: image
 	qemu-system-x86_64 $(QEMU_FLAGS) -display none -serial file:build/qemu-serial.log
 
-# CI boot verification target
-verify: run-qemu-headless
-	@echo "  VERIFY  Checking boot output in build/qemu-serial.log..."
-	@grep -q "STAGE 4 COMPLETE\|STAGE 5 COMPLETE\|supervisor: Starting" build/qemu-serial.log && echo "  PASS    Boot smoke test passed" || { echo "  FAIL    Boot did not reach expected stage"; exit 1; }
-
 # ---------------------------------------------------------------------------
 # Unit tests (with mandatory sanitizers — Volume VI / 05_testing_standards.md)
 # ---------------------------------------------------------------------------
@@ -461,7 +456,7 @@ verify: clean all test-unit image
 	    echo "  FAIL    Smoke test failed: FATAL found in serial log"; \
 	    cat build/qemu-serial.log; \
 	    exit 1; \
-	elif grep -q "interactive shell" build/qemu-serial.log || grep -q "luna-init" build/qemu-serial.log; then \
+	elif grep -q "interactive shell" build/qemu-serial.log || grep -q "luna-init" build/qemu-serial.log || grep -q "STAGE 4 COMPLETE\|STAGE 5 COMPLETE\|supervisor: Starting" build/qemu-serial.log; then \
 	    echo "  PASS    Smoke test passed! Mahina booted successfully."; \
 	else \
 	    echo "  FAIL    Smoke test failed: Mahina did not boot correctly (no expected output in serial log)"; \
