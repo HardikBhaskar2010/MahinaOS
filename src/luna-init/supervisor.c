@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
-#include <netdb.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -136,21 +135,40 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
             }
             if (port <= 0 || port > 65535) port = 80;
 
-            /* Resolve hostname */
-            struct addrinfo hints = {0};
-            hints.ai_family   = AF_INET;
-            hints.ai_socktype = SOCK_STREAM;
-            struct addrinfo *ai = NULL;
-            char port_s[8];
-            snprintf(port_s, sizeof(port_s), "%d", port);
-            if (getaddrinfo(host, port_s, &hints, &ai) != 0 || !ai)
-                return false;
+            /*
+             * In statically-linked PID 1 binaries, NSS-dependent libc calls like
+             * getaddrinfo() attempt dynamic dlopen of libnss_*.so plugins at runtime.
+             * When glibc is statically linked, this triggers linker warnings:
+             *   "warning: Using 'getaddrinfo' in statically linked applications requires at runtime..."
+             * and will fail or crash at runtime if the target rootfs lacks the matching
+             * shared glibc libraries or nsswitch configuration.
+             *
+             * Since supervisor HTTP readiness probes in MahinaOS target local services
+             * (e.g. luna-ai-d, web server on localhost or IPv4 addresses), we parse the
+             * IP address directly with inet_pton(), mapping "localhost" -> 127.0.0.1.
+             * This requires zero NSS lookups, zero dynamic library loading, and produces
+             * no static linking warnings.
+             */
+            struct sockaddr_in saddr;
+            memset(&saddr, 0, sizeof(saddr));
+            saddr.sin_family = AF_INET;
+            saddr.sin_port   = htons((uint16_t)port);
 
-            int sock = socket(ai->ai_family, SOCK_STREAM | SOCK_NONBLOCK, 0);
-            if (sock < 0) { freeaddrinfo(ai); return false; }
+            const char *ip_str = host;
+            if (strcmp(host, "localhost") == 0 || host[0] == '\0') {
+                ip_str = "127.0.0.1";
+            }
+
+            if (inet_pton(AF_INET, ip_str, &saddr.sin_addr) <= 0) {
+                LOG_WARN(COMP, "HTTP probe: cannot resolve non-numeric host '%s' without NSS in static PID 1", host);
+                return false;
+            }
+
+            int sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+            if (sock < 0) return false;
 
             bool ready = false;
-            int  cr = connect(sock, ai->ai_addr, ai->ai_addrlen);
+            int  cr = connect(sock, (struct sockaddr *)&saddr, sizeof(saddr));
             if (cr == 0) {
                 ready = true; /* immediate connect (unlikely but handle) */
             } else if (errno == EINPROGRESS) {
@@ -184,7 +202,6 @@ bool supervisor_check_ready(service_t *svc, long long start_ms) {
                 }
             }
             close(sock);
-            freeaddrinfo(ai);
             return ready;
         }
 
