@@ -12,6 +12,8 @@ members = [
     "luna-about-rs",
     "luna-island-rs",
     "luna-setup-rs",
+    "mahina-control",
+    "mahina-ctl",
 ]
 
 [profile.release]

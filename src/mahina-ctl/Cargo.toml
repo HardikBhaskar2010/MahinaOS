@@ -1,0 +1,11 @@
+[package]
+name = "mahina-ctl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hardik Bhaskar <hardik.bhaskar2010@gmail.com>"]
+description = "MahinaOS System Control CLI — Administrative Interface to Mahina Control Plane"
+
+[dependencies]
+mahina-control = { path = "../mahina-control" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

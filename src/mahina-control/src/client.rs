@@ -1,0 +1,84 @@
+use crate::daemon::DEFAULT_SOCKET_PATH;
+use crate::error::ControlError;
+use crate::protocol::{Request, Response, SystemState};
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::UnixStream;
+use std::path::{Path, PathBuf};
+
+pub struct ControlClient {
+    _socket_path: PathBuf,
+    stream: UnixStream,
+    reader: BufReader<UnixStream>,
+    next_id: u64,
+}
+
+impl ControlClient {
+    pub fn connect(socket_path: impl AsRef<Path>) -> Result<Self, ControlError> {
+        let stream = UnixStream::connect(&socket_path)
+            .map_err(|e| ControlError::Io(format!("Failed to connect to control socket '{:?}': {}", socket_path.as_ref(), e)))?;
+        let reader = BufReader::new(stream.try_clone()?);
+
+        Ok(Self {
+            _socket_path: socket_path.as_ref().to_path_buf(),
+            stream,
+            reader,
+            next_id: 1,
+        })
+    }
+
+    pub fn default_connect() -> Result<Self, ControlError> {
+        Self::connect(DEFAULT_SOCKET_PATH)
+    }
+
+    pub fn call(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+        request_id: Option<String>,
+        capability_token: Option<String>,
+    ) -> Result<serde_json::Value, ControlError> {
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let req = Request {
+            id,
+            method: method.to_string(),
+            params,
+            request_id,
+            capability_token,
+        };
+
+        let mut raw_line = serde_json::to_string(&req)?;
+        raw_line.push('\n');
+
+        self.stream.write_all(raw_line.as_bytes())?;
+        self.stream.flush()?;
+
+        let mut resp_line = String::new();
+        self.reader.read_line(&mut resp_line)?;
+
+        let resp: Response = serde_json::from_str(resp_line.trim())?;
+        if resp.ok {
+            Ok(resp.result.unwrap_or(serde_json::Value::Null))
+        } else {
+            let err = resp.error.map(|e| e.message).unwrap_or_else(|| "Unknown error".to_string());
+            Err(ControlError::Internal(err))
+        }
+    }
+
+    pub fn system_get_state(&mut self) -> Result<SystemState, ControlError> {
+        let val = self.call("system.get_state", serde_json::json!({}), None, None)?;
+        let state: SystemState = serde_json::from_value(val)?;
+        Ok(state)
+    }
+
+    pub fn system_reboot(&mut self, token: Option<String>) -> Result<(), ControlError> {
+        let _ = self.call("system.reboot", serde_json::json!({}), None, token)?;
+        Ok(())
+    }
+
+    pub fn system_shutdown(&mut self, token: Option<String>) -> Result<(), ControlError> {
+        let _ = self.call("system.shutdown", serde_json::json!({}), None, token)?;
+        Ok(())
+    }
+}

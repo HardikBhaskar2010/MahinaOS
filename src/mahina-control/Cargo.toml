@@ -1,0 +1,16 @@
+[package]
+name = "mahina-control"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hardik Bhaskar <hardik.bhaskar2010@gmail.com>"]
+description = "MahinaOS System Control Plane — Policy, Routing, Authorization, and Subsystem Orchestration"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+nix = "0.26"
+libc = "0.2"
+
+[[bin]]
+name = "mahina-control-d"
+path = "src/main.rs"

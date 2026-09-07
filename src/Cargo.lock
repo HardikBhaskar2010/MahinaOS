@@ -132,6 +132,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "mahina-control"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "nix",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "mahina-ctl"
+version = "0.1.0"
+dependencies = [
+ "mahina-control",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
