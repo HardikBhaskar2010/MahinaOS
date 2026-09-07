@@ -364,6 +364,11 @@ run-qemu: image
 run-qemu-headless: image
 	qemu-system-x86_64 $(QEMU_FLAGS) -display none -serial file:build/qemu-serial.log
 
+# CI boot verification target
+verify: run-qemu-headless
+	@echo "  VERIFY  Checking boot output in build/qemu-serial.log..."
+	@grep -q "STAGE 4 COMPLETE\|STAGE 5 COMPLETE\|supervisor: Starting" build/qemu-serial.log && echo "  PASS    Boot smoke test passed" || { echo "  FAIL    Boot did not reach expected stage"; exit 1; }
+
 # ---------------------------------------------------------------------------
 # Unit tests (with mandatory sanitizers — Volume VI / 05_testing_standards.md)
 # ---------------------------------------------------------------------------
