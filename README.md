@@ -11,16 +11,16 @@ Mahina OS is a ground-up initiative to build a clean, deterministic, and highly 
 
 It aims to provide:
 1. **Uncompromising Determinism:** Through our custom `luna-init` service manager.
-2. **Beautiful Aesthetics:** Starting from the very first frame of the bootloader (`luna-splash`).
+2. **Beautiful Aesthetics:** Starting from the early graphical boot splash (`luna-splash`) launched by `luna-init`.
 3. **Deep AI Integration:** A system designed to be operated natively by intelligent agents.
 
 ## ✨ Features
 
 - **`luna-init`:** A completely custom PID 1 init system. It uses TOML for service definitions, builds a deterministic dependency graph, detects cycles, and reaps zombies gracefully.
-- **`luna-splash`:** A decoupled boot graphics engine that paints the screen directly via the Linux framebuffer (`/dev/fb0`), completely free of dynamic memory allocation (`malloc`).
+- **`luna-splash`:** A decoupled boot graphics engine that paints the screen directly via the Linux framebuffer (`/dev/fb0`).
 - **LGP (Luna Graphics Protocol):** A modern, minimal display protocol designed to replace heavy legacy systems, complete with surface management, alpha blending, and privileged Window Manager extensions.
-- **LunaGUI Toolkit:** A lightweight native GUI library in C17 featuring a robust widget tree, custom layouts (VBox/HBox), scrolling, and event-routing.
-- **luna-shell:** A native desktop shell and Window Manager.
+- **LunaGUI Toolkit:** A lightweight native GUI library in Rust 2021 (`lunagui-rs`) featuring a robust widget tree, custom layouts (VBox/HBox), scrolling, and event-routing over the LGP wire protocol.
+- **`luna-shell`:** A native desktop shell and Window Manager in Rust 2021 (`luna-shell-rs`).
 - **Documentation-First:** No code is written unless it is first codified in the Divine Collection of Knowledge about Luna (DCKL).
 
 ## 🏗️ Architecture
@@ -30,18 +30,23 @@ Mahina's architecture is explicitly defined in the `docs/DCKL/` directory. If yo
 ### Core Components
 - **Kernel:** Custom-configured Linux kernel.
 - **Bootloader:** Limine.
-- **Init System:** `luna-init` (Custom C17).
+- **Init System:** `luna-init` (Custom C17, statically linked PID 1).
 - **Boot Splash:** `luna-splash` (Custom C17).
-- **Compositor:** `lgp-compositor` (Custom C17).
-- **Desktop Shell:** `luna-shell` (Custom C17).
+- **Compositor:** `lgp-compositor` (Custom C17, DRM/KMS + custom LGP protocol).
+- **Display Client & GUI Toolkit:** `lgp-rs` & `lunagui-rs` (Rust 2021).
+- **Desktop Shell:** `luna-shell` (Rust 2021, crate `luna-shell-rs`).
+- **Package Manager:** `lpkg` (Custom C17 with Ed25519 signature verification via libsodium).
+- **AI Daemon:** `luna-ai-d` (Custom C17).
 
 ## 🛠️ Build Instructions
 
 Mahina uses a standard Makefile toolchain. You must be on Linux or WSL2 to build the final disk image.
 
 ### Prerequisites
-- Clang/LLVM toolchain
+- Clang/LLVM toolchain (`clang`, `lld`, `llvm-ar`)
+- Rust toolchain (`cargo`, `rustc` 2021 edition, pinned via `rust-toolchain.toml` to 1.80.1) with `x86_64-unknown-linux-musl` target
 - `make`
+- Development libraries: `libdrm-dev`, `libsodium-dev`, `libinput-dev`, `libudev-dev`
 - QEMU (for virtualization testing)
 - `mtools`, `xorriso`, `parted` (for ISO/IMG generation)
 
@@ -63,7 +68,7 @@ make run-qemu
 
 ## 🗺️ Roadmap
 
-Mahina is currently in the **Phase 3: AI & Shell Integration** stage. We have successfully implemented a deterministic init system, boot graphics, the compositor, the native LunaGUI widget toolkit, a window manager shell, and ten desktop applications.
+Mahina is currently in the **Phase 3: AI & Shell Integration** stage. We have successfully implemented a deterministic init system, boot graphics, the compositor, the native LunaGUI widget toolkit, a window manager shell, and eight desktop applications.
 
 See [ROADMAP.md](ROADMAP.md) for a high-level overview, or dive into `docs/DCKL/Volume VII - Implementation Roadmap/` for specific engineering milestones.
 
